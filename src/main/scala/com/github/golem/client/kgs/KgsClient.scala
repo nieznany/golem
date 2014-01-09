@@ -12,6 +12,7 @@ import akka.actor.{Props, Actor}
 import scala.concurrent.duration.Duration
 import com.github.golem.command.administrative.{ListCommands, GetVersion, GetName, StartClient}
 import akka.event.Logging
+import com.github.golem.command.tournament.DeadFinalStatusList
 
 object KgsClient {
   def props(properties: Properties, logFilename: String) = Props(classOf[KgsClient], properties, logFilename)
@@ -105,13 +106,21 @@ class KgsClient(properties: Properties, logFilename: String) extends Actor {
     val commandName = arguments(0)
 
     commandName match {
+      // Setup
       case "boardsize" => SetBoardSize(arguments(1).toInt)
       case "komi" => SetKomi(arguments(1).toDouble)
+      case "quit" => QuitGame
       // Administrative
       case "list_commands" => ListCommands
       case "name" => GetName
       case "version" => GetVersion
-      case u => {println("Unsupported"); throw new UnsupportedOperationException(u)}
+      // Game
+      case "play" =>
+      case "genmove" =>
+      // Tournament
+      case "time_left" =>
+      case "final_status_list" =>  DeadFinalStatusList // In kgsGtp final status list is handled only with argument 'dead'
+      case u => throw new UnsupportedOperationException(u)
     }
   }
 

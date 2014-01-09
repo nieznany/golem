@@ -1,4 +1,8 @@
 package com.github.golem.command
 
-trait Command {
-}
+trait Command
+
+/**
+ * Informative means 'response is ommited'.
+ */
+trait Informative
