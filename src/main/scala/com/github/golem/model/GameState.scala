@@ -1,5 +1,13 @@
 package com.github.golem.model
 
-case class GameState {
+object GameState {
+  /**
+   * Creates empty list of moves.
+   * @return
+   */
+  def apply() = GameState(List())
+}
+
+case class GameState(moves: List[Move]) {
 
 }
