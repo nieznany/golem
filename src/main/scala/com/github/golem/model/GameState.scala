@@ -1,3 +1,33 @@
 package com.github.golem.model
 
-case class GameState(moves: List[Move], board: Board)
+import com.github.golem.model.Board.Field
+import com.github.golem.model.GameState.MovesHistory
+
+object GameState {
+  case class MovesHistory(moves: List[Move]) {
+    def +(move: Move): MovesHistory = copy(moves = move :: moves)
+
+    /**
+     * The latest = apply(0)
+     * The oldest = apply(n)
+     **/
+    def apply(timeFromNow: Int): Move = moves(timeFromNow)
+  }
+}
+
+case class GameState(history: MovesHistory, board: Board) {
+  /**
+   * Updates only list of moves.
+   *
+   * @param move move to add
+   * @return new game state with updated list of moves.
+   */
+  def +(move: Move): GameState = copy(history = this.history + move)
+
+  def +(move: Move, fields: Iterable[Field]): GameState = copy(history = this.history + move, board = this.board ++ fields)
+
+  def getMove(i: Int): Move = history(i)
+
+  def getLastMove: Move = getMove(0)
+}
+

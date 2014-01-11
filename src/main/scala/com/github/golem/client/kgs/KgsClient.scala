@@ -115,10 +115,10 @@ class KgsClient(properties: Properties, logFilename: String) extends Actor {
       case "name" => GetName
       case "version" => GetVersion
       // Game
-      case "play" =>
-      case "genmove" =>
+      case "play" => ???
+      case "genmove" => ???
       // Tournament
-      case "time_left" =>
+      case "time_left" => ???
       case "final_status_list" =>  DeadFinalStatusList // In kgsGtp final status list is handled only with argument 'dead'
       case u => throw new UnsupportedOperationException(u)
     }

@@ -1,5 +1,5 @@
 package com.github.golem.exception
 
-import com.github.golem.model.Put
+import com.github.golem.model.Move
 
-class IllegalMoveException(move: Put) extends RuntimeException
+class IllegalMoveException(move: Move) extends RuntimeException
