@@ -24,7 +24,16 @@ case class GameState(history: MovesHistory, board: Board) {
    */
   def +(move: Move): GameState = copy(history = this.history + move)
 
-  def +(move: Move, fields: Iterable[Field]): GameState = copy(history = this.history + move, board = this.board ++ fields)
+  def ++(move: Move): GameState = {
+    move match {
+      case pass: Pass => this + pass
+      case put: Put => copy(history = this.history + move, board = this.board + put.stone)
+    }
+  }
+
+  def ++(fields: Iterable[Field]): GameState = copy(board = this.board ++ fields)
+
+  def ++(move: Move, fields: Iterable[Field]): GameState = copy(history = this.history + move, board = this.board ++ fields)
 
   def getMove(i: Int): Move = history(i)
 

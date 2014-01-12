@@ -122,4 +122,5 @@ case class Board private(nrows: Int, ncolumns: Int, fields: Map[Coords, Field]) 
     }
     result.toString
   }
+  fields(Coords(1,0))
 }
