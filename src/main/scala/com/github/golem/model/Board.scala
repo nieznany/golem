@@ -28,9 +28,15 @@ object Board {
 
   case class Free(override val position: Coords) extends FreeField
 
-  case class Stone(override val position: Coords, owner: Player) extends Field with Disabled
+  case class Stone(override val position: Coords, owner: Player) extends Field with Disabled {
+    def toFree = Free(position)
+  }
 
-  case class Ko(override val position: Coords, disabledFor: Player) extends FreeField with Disabled
+  case class Unavailable(override val position: Coords, disabledFor: Player) extends FreeField with Disabled {
+    def this(freeField: FreeField, player: Player) = {
+      this(freeField.position, player)
+    }
+  }
 
 
   def apply(nrows: Int, ncolumns: Int) = {
@@ -59,6 +65,8 @@ object Board {
             case 'o' => Stone(Coords(i, j), Human)
             case 'x' => Stone(Coords(i, j), Engine)
             case '.' => Free(Coords(i, j))
+            case 'O' => Unavailable(Coords(i, j), Human)
+            case 'X' => Unavailable(Coords(i, j), Engine)
           }
           j += 1
           field
@@ -81,11 +89,6 @@ case class Board private(nrows: Int, ncolumns: Int, fields: Map[Coords, Field]) 
   def isOutOfBounds(row: Int, column: Int) = {
     row < 0 || row > nrows + 1 || column < 0 || column > ncolumns + 1
   }
-  //  def isLegal(m: Put): Boolean = { // Should not be here! Game state should contains method to check, if given field is illegal for given player
-  //    val r = m.stone.position.row
-  //    val c = m.stone.position.column
-  //    ! isOutOfBounds(r, c) && this(r, c) != FieldState.FREE
-  //  }
 
   @throws[IndexOutOfBoundsException]("Field is out of bounds.")
   def apply(row: Int, column: Int): Field = {
@@ -103,17 +106,24 @@ case class Board private(nrows: Int, ncolumns: Int, fields: Map[Coords, Field]) 
   def +(field: Field): Board = this.copy(fields = this.fields + (field.position -> field))
 
   /**
+   * Returns true, if selected field is of type Disabled, otherwise false.
+   */
+  def isDisabled(coords: Coords): Boolean = this(coords).isInstanceOf[Disabled]
+
+  /**
    * Will update field, if already exists.
    */
   def ++(newFields: Iterable[Field]): Board = this.copy(fields = this.fields ++ (for {field <- newFields} yield field.position -> field))
 
   override def toString = {
     val result = new StringBuilder(s"board($nrows x $ncolumns):\n")
-    for(i <- 0 to nrows + 1) {
-      for (j <- 0 to ncolumns + 1) {
+    for(i <- 1 to nrows) {
+      for (j <- 1 to ncolumns) {
         val c = this(i, j) match {
           case Stone(_, Engine) => 'x'
           case Stone(_, Human) => 'o'
+          case Unavailable(_, Human) => 'O'
+          case Unavailable(_, Engine) => 'X'
           case _: FreeField => '.'
         }
         result append c

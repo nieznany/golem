@@ -5,6 +5,9 @@ import com.github.golem.model.GameState.MovesHistory
 
 object GameState {
   case class MovesHistory(moves: List[Move]) {
+    def this() {
+      this(List[Move]())
+    }
     def +(move: Move): MovesHistory = copy(moves = move :: moves)
 
     /**
@@ -16,6 +19,9 @@ object GameState {
 }
 
 case class GameState(history: MovesHistory, board: Board) {
+  def this(board: Board) = {
+    this(new MovesHistory(), board)
+  }
   /**
    * Updates only list of moves.
    *
@@ -23,6 +29,8 @@ case class GameState(history: MovesHistory, board: Board) {
    * @return new game state with updated list of moves.
    */
   def +(move: Move): GameState = copy(history = this.history + move)
+
+  def +(field: Field): GameState = copy(board = this.board + field)
 
   def ++(move: Move): GameState = {
     move match {
