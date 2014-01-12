@@ -6,6 +6,10 @@ import com.github.golem.model.Board._
 // TODO how to avoid parameter 'state' in each method? Choose one of the possibilities
 object BasicRulesGame extends Game {
 
+  case class Chain(fields: Set[Field], nbreaths: Int)
+
+  val DIRECTIONS = List(N, S, W, E)
+
   def makeMove(move: Move, state: GameState): GameState = {
     move match {
       case _: Pass => state + move
@@ -22,13 +26,13 @@ object BasicRulesGame extends Game {
     val besteadStone = put.stone
     val board = state.board
 
-    val chains = (for {direction <- List(N, S, W, E)
-          chainOption = getChain(besteadStone.position + direction, besteadStone.owner.opponent(), board)
-          if chainOption != None
-          chain = chainOption.asInstanceOf[Option[(Set[Field], Int)]].get
-          if chain._2 == 0 // Only death chains
-    } yield chain._1)
-    if(! chains.isEmpty) {
+    val chains = (for {direction <- DIRECTIONS
+                       chainOption = getChain(besteadStone.position + direction, besteadStone.owner.opponent(), board)
+                       if chainOption != None
+                       chain = chainOption.asInstanceOf[Option[Chain]].get
+                       if chain.nbreaths == 0 // Only death chains
+    } yield chain.fields)
+    if (!chains.isEmpty) {
       chains reduceLeft ((a, b) => a ++ b) map (stone => Free(stone.position))
     }
     else Set[Field]()
@@ -38,7 +42,7 @@ object BasicRulesGame extends Game {
    * @return as for the getChain(:Field, :Board), but return None, if coords points to stone,
    *         which does not belong to given player.
    */
-  def getChain(memberCoords: Coords, player: Player, board: Board): Option[(Set[Field], Int)] = {
+  def getChain(memberCoords: Coords, player: Player, board: Board): Option[Chain] = {
     val member = board(memberCoords)
     member match {
       case s: Stone => if (s.owner != player) None else getChain(member, board)
@@ -46,7 +50,7 @@ object BasicRulesGame extends Game {
     }
   }
 
-  def getChain(memberCoords: Coords, board: Board): Option[(Set[Field], Int)] = {
+  def getChain(memberCoords: Coords, board: Board): Option[Chain] = {
     val member = board(memberCoords)
     getChain(member, board)
   }
@@ -57,12 +61,12 @@ object BasicRulesGame extends Game {
    *         belongs to owner of the stone placed at $memberCoords.
    *         Equals None, when given field is not a Stone.
    */
-  def getChain(member: Field, board: Board): Option[(Set[Field], Int)] = {
+  def getChain(member: Field, board: Board): Option[Chain] = {
     member match {
       case s: Stone => {
         val traverser = new ChainTraverser(board, s.owner)
         traverser.traverse(s)
-        Some((traverser.chain, traverser.nbreaths))
+        Some(traverser.getChain)
       }
       case _ => None
     }
@@ -79,7 +83,7 @@ object BasicRulesGame extends Game {
 
   private class ChainTraverser(board: Board,
                                player: Player,
-                               var chain: Set[Field] = Set[Field](),
+                               var chainFields: Set[Field] = Set[Field](),
                                var nbreaths: Int = 0) {
 
     private var visitedFields = Set[Field]()
@@ -90,8 +94,8 @@ object BasicRulesGame extends Game {
         field match {
           case s: Stone => {
             if (s.owner == player) {
-              chain += s
-              List(N, S, W, E) foreach (direction => traverse(board(field.position + direction)))
+              chainFields += s
+              DIRECTIONS foreach (direction => traverse(board(field.position + direction)))
               traverse(s)
             }
           }
@@ -102,6 +106,7 @@ object BasicRulesGame extends Game {
         }
       }
     }
+    def getChain = Chain(chainFields, nbreaths)
   }
 
 }

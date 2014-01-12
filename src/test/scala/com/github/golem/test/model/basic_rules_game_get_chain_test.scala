@@ -14,8 +14,8 @@ class basic_rules_game_get_chain_test extends GolemUnitSpec {
    "A game" should "declare long chain of engine stones" in {
       val chain = BasicRulesGame getChain (Coords(2, 4), board1)
 
-      chain.value._2 should be (2)
-      chain.value._1 should contain allOf (Stone(Coords(1,5), Engine),
+      chain.value.nbreaths should be (2)
+      chain.value.fields should contain allOf (Stone(Coords(1,5), Engine),
                                             Stone(Coords(2,4), Engine),
                                             Stone(Coords(2,5), Engine),
                                             Stone(Coords(3,5), Engine))
@@ -28,22 +28,22 @@ class basic_rules_game_get_chain_test extends GolemUnitSpec {
   it should "declare chain for one stone next border" in {
       val chain = BasicRulesGame getChain (Coords(1, 3), board1)
 
-      chain.value._2 should be (3)
-      chain.value._1 should contain (Stone(Coords(1, 3), Engine))
+      chain.value.nbreaths should be (3)
+      chain.value.fields should contain (Stone(Coords(1, 3), Engine))
   }
 
   it should "declare chain for one stone in corner" in {
       val chain = BasicRulesGame getChain (Coords(1, 1), board1)
 
-      chain.value._2 should be (1)
-      chain.value._1 should contain (Stone(Coords(1, 1), Engine))
+      chain.value.nbreaths should be (1)
+      chain.value.fields should contain (Stone(Coords(1, 1), Engine))
   }
 
   it should "declare chain for other player" in {
     val chain = BasicRulesGame getChain (Coords(2, 2), board1)
 
-    chain.value._2 should be (3)
-    chain.value._1 should contain allOf (Stone(Coords(2, 1), Human),
+    chain.value.nbreaths should be (3)
+    chain.value.fields should contain allOf (Stone(Coords(2, 1), Human),
                                          Stone(Coords(2, 2), Human),
                                          Stone(Coords(3, 2), Human),
                                          Stone(Coords(3, 3), Human),
