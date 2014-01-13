@@ -44,9 +44,8 @@ object KgsClient {
  * So if you want to change something in below class, please, be careful!
  */
 class KgsClient(properties: Properties, logFilename: String) extends Actor {
-  private val LOG = Logging(context.system, this)
-
   import context._
+  private val LOG = Logging(system, this)
 
   val NAME = "sagolem"
   // TODO get name and version from sbt build file
@@ -104,8 +103,8 @@ class KgsClient(properties: Properties, logFilename: String) extends Actor {
         case ListCommands => sendAvailableCommands
         case GetName => sendName
         case GetVersion => sendVersion
-        case i: Informative => {
-          commander ! i
+        case c: Informative => {
+          commander ! c
           sendResponse(EmptyResponse)
         }
         case c: Command => {
@@ -158,11 +157,7 @@ class KgsClient(properties: Properties, logFilename: String) extends Actor {
         val move = arguments(2) match {
           case "pass" => Pass(Human)
           case _ => {
-            val column = arguments(2).charAt(0).toLower match {
-              case c if c < 'i' => c - 'a' + 1
-              // j is ommited
-              case c => c - 'a' + 2
-            }
+            val column = getBoardColumn(arguments(2).charAt(0).toLower)
             val row = arguments(2).charAt(1).toInt
             Put(Stone(Coords(row, column), Human))
           }
@@ -221,7 +216,7 @@ class KgsClient(properties: Properties, logFilename: String) extends Actor {
 
   private def printMove(move: Move): String = {
     move match {
-      case Pass => "pass" // TODO move common strings and chars to vals
+      case Pass(_) => "pass" // TODO move common strings and chars to vals
       case Put(Stone(Coords(r, c), _)) => {
         StringBuilder.newBuilder.append(getBoardColumn(c)).append(r).toString()
       }
