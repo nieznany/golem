@@ -1,6 +1,8 @@
 package com.github.golem.command.game
 
-import com.github.golem.model.Put
-import com.github.golem.command.Command
+import com.github.golem.command.{CommandResponse, Command}
+import com.github.golem.model.Move
 
-case class GenerateMove(move: Put) extends Command
+object GenerateMove extends Command {
+  case class Response(move: Move) extends CommandResponse
+}

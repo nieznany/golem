@@ -5,6 +5,5 @@ import com.github.golem.command.Command
 /**
  * Command sent, when engine should choose, which stones are dead.
  */
-object DeadFinalStatusList extends Command {
-}
+object DeadFinalStatusList extends Command
 
