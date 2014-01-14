@@ -135,8 +135,16 @@ object BasicRulesGame extends Game {
 
   def isLegal(move: Move, state: GameState): Boolean = {
     move match {
-      case Put(Stone(Coords(r, c), _)) => {
-        ! state.board.isOutOfBounds(r, c) && state.board(r, c).isInstanceOf[Free]
+      case Put(Stone(Coords(r, c), owner)) => {
+        if(state.board.isOutOfBounds(r, c))
+          return false
+
+        val field = state.board(r, c)
+        field match {
+          case Unavailable(_, `owner`) => false
+          case ff: FreeField => true
+          case _ => false
+        }
       }
       case _ => true
     }

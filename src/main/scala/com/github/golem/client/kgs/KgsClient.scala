@@ -158,7 +158,7 @@ class KgsClient(properties: Properties, logFilename: String) extends Actor {
           case "pass" => Pass(Human)
           case _ => {
             val column = getBoardColumn(arguments(2).charAt(0).toLower)
-            val row = arguments(2).charAt(1).toInt
+            val row = arguments(2).substring(1).toInt
             Put(Stone(Coords(row, column), Human))
           }
         }
@@ -229,14 +229,14 @@ class KgsClient(properties: Properties, logFilename: String) extends Actor {
     columnSign match {
       case c if c < missingBoardColumnChar => c - 'a' + 1
       // j is missing
-      case c => c - 'a' + 2
+      case c => c - 'a'
     }
   }
 
   private def getBoardColumn(columnNumber: Int): Char = {
     columnNumber match {
       case n if n < missingBoardColumnNumber => ('a'.toInt + (n - 1)).toChar
-      case n => ('a'.toInt + (n - 2)).toChar
+      case n => ('a'.toInt + n).toChar
     }
   }
 

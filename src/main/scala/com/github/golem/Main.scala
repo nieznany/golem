@@ -11,8 +11,8 @@ object Main {
       throw new IllegalArgumentException("You should provide exactly two parameters:" +
         " path to kgs client properties file, path to log file")
     }
-    val system = ActorSystem()
-    val client = system.actorOf(KgsClient.props(args(0), args(1)))
+    val system = ActorSystem("golem")
+    val client = system.actorOf(KgsClient.props(args(0), args(1)), "kgsclient")
     client ! StartClient
   }
 

@@ -5,10 +5,9 @@ import com.github.golem.model._
 import com.github.golem.command.game.{GenerateMove, MadeMove}
 import com.github.golem.command.Informative
 import com.github.golem.command.Command
-import akka.event.Logging
-import com.github.golem.command.setup.{QuitGame, SetBoardSize}
+import akka.event.{LoggingAdapter, Logging}
+import com.github.golem.command.setup.{SetKomi, QuitGame, SetBoardSize}
 import com.github.golem.model.Pass
-import com.github.golem.command.setup.SetBoardSize
 import scala.Some
 import com.github.golem.model.Board.{FreeField, Stone, Coords}
 import com.github.golem.model.BasicRulesGame.Chain
@@ -42,13 +41,13 @@ object Commander {
     def -(actors: Set[ActorRef]): Subordinates = {
       var newSubMap = subordinatesMap
       var newRefPositions = referenceStones
-      for (actor <- actors) {
         for (kv <- subordinatesMap) {
           // FIX very inefficient, but most general (it will actually remove all actor's stones) - what to do with this method?
-          newSubMap -= kv._1
+          if(actors.contains(kv._2))
+            newSubMap -= kv._1
         }
+      for(actor <- actors)
         newRefPositions -= actor
-      }
       Subordinates(newRefPositions, newSubMap)
     }
 
@@ -56,7 +55,7 @@ object Commander {
 
 }
 
-class Commander extends Actor {
+class Commander extends GolemActor {
 
   import context._
 
@@ -68,34 +67,43 @@ class Commander extends Actor {
   private var currentGameState: Option[GameState] = None
   private var subordinates: Subordinates = new Subordinates
 
-  def receive: Actor.Receive = {
-    case m: Informative => {
-      m match {
-        case SetBoardSize(size) => {
-          // Start new game
-          currentGameState = Some(new GameState(Board(size, size)))
-          subordinates = Subordinates()
-          LOG.info(s"Starting new game: $currentGameState")
-        }
+  def handle(message: Any) = {
+    message match {
+      case i: Informative => {
+        i match {
+          case SetBoardSize(size) => {
+            // Start new game
+            currentGameState = Some(new GameState(Board(size, size)))
+            subordinates = Subordinates()
+            LOG.info(s"Starting new game: $currentGameState")
+          }
+          case SetKomi(_) => {
+            LOG.info("Ignoring information about Komi.")
+          }
 
-        case QuitGame => {
-          LOG.info(s"Finishing game, result state: $currentGameState")
-          subordinates.getActors foreach (subordinate => subordinate ! PoisonPill)
-          currentGameState = None
-          subordinates = Subordinates()
-        }
-        case MadeMove(move) => {
-          updateFor(move)
-          LOG.info(s"New game state: $currentGameState") // TODO change to debug
+          case QuitGame => {
+            LOG.info(s"Finishing game, result state: $currentGameState")
+            subordinates.getActors foreach (subordinate => subordinate ! PoisonPill)
+            currentGameState = None
+            subordinates = Subordinates()
+          }
+          case MadeMove(move) => {
+            updateFor(move)
+            LOG.info(s"New game state: $currentGameState") // TODO change to debug
+            LOG.info(s"$subordinates")
+          }
         }
       }
-    }
-    case m: Command => {
-      m match {
-        case GenerateMove => {
-          // TODO - do something
-          sender ! GenerateMove.Response(Pass(identity))
+      case cmd: Command => {
+        cmd match {
+          case GenerateMove => {
+            // TODO - do something
+            sender ! GenerateMove.Response(Pass(identity))
+          }
         }
+      }
+      case ufo => {
+        LOG.warning(s"I saw UFO: $ufo. I will ignore it...")
       }
     }
   }
@@ -198,7 +206,9 @@ class Commander extends Actor {
   }
 
   private def createSubordinateName(subordType: String, position: Coords) = {
-    s"${subordType}_${position.row}_${position.column}"
+    s"${subordType}_${position.row}_${position.column}_${getGameState.history.moves.size}"
   }
+
+  def getLogger: LoggingAdapter = LOG
 
 }
