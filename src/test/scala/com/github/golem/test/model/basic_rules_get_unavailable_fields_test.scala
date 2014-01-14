@@ -2,7 +2,7 @@ package com.github.golem.test.model
 
 import com.github.golem.model.{Human, Engine, BasicRulesGame, Board}
 import com.github.golem.test.GolemUnitSpec
-import com.github.golem.model.Board.{Unavailable, Coords, Free}
+import com.github.golem.model.Board.{FreeField, Unavailable, Coords, Free}
 import scala.collection.immutable.Vector
 
 class basic_rules_get_unavailable_fields_test extends GolemUnitSpec {
@@ -13,7 +13,7 @@ class basic_rules_get_unavailable_fields_test extends GolemUnitSpec {
       "x.x.",
       ".x.x",
       "..x."))
-    BasicRulesGame.getUnavailableFields(Human, board) should contain theSameElementsAs Vector(
+    getOnlyUnavailable(BasicRulesGame.updateAvailabilityOfFields(Human, board)) should contain theSameElementsAs Vector(
       Unavailable(Coords(1, 1), Human),
       Unavailable(Coords(2, 2), Human),
       Unavailable(Coords(3, 3), Human),
@@ -26,7 +26,7 @@ class basic_rules_get_unavailable_fields_test extends GolemUnitSpec {
       "..ox",
       "xo..",
       ".xo."))
-    BasicRulesGame.getUnavailableFields(Human, board) should contain theSameElementsAs Vector(
+    getOnlyUnavailable(BasicRulesGame.updateAvailabilityOfFields(Human, board)) should contain theSameElementsAs Vector(
       Unavailable(Coords(1, 4), Human))
   }
 
@@ -36,8 +36,8 @@ class basic_rules_get_unavailable_fields_test extends GolemUnitSpec {
       "..ox",
       "xo.o",
       ".xo."))
-    BasicRulesGame.getUnavailableFields(Human, board) shouldBe empty
-    BasicRulesGame.getUnavailableFields(Engine, board) should contain theSameElementsAs Vector(
+    getOnlyUnavailable(BasicRulesGame.updateAvailabilityOfFields(Human, board)) shouldBe empty
+    getOnlyUnavailable(BasicRulesGame.updateAvailabilityOfFields(Engine, board)) should contain theSameElementsAs Vector(
       Unavailable(Coords(3, 3), Engine),
       Unavailable(Coords(4, 4), Engine)
     )
@@ -51,7 +51,7 @@ class basic_rules_get_unavailable_fields_test extends GolemUnitSpec {
       "oxxxo",
       "ooooo"))
 
-    BasicRulesGame.getUnavailableFields(Engine, board) should contain theSameElementsAs Vector(
+    getOnlyUnavailable(BasicRulesGame.updateAvailabilityOfFields(Engine, board)) should contain theSameElementsAs Vector(
       Unavailable(Coords(3,3), Engine)
     )
   }
@@ -61,8 +61,8 @@ class basic_rules_get_unavailable_fields_test extends GolemUnitSpec {
       "xoo",
       "x.o",
       "xxo"))
-    BasicRulesGame.getUnavailableFields(Human, board) shouldBe empty
-    BasicRulesGame.getUnavailableFields(Engine, board) shouldBe empty
+    getOnlyUnavailable(BasicRulesGame.updateAvailabilityOfFields(Human, board)) shouldBe empty
+    getOnlyUnavailable(BasicRulesGame.updateAvailabilityOfFields(Engine, board)) shouldBe empty
   }
 
   "A game" should "should distinguish suicide and attack move (2)" in {
@@ -74,7 +74,11 @@ class basic_rules_get_unavailable_fields_test extends GolemUnitSpec {
       "oxox..",
       ".ox..."))
 
-    BasicRulesGame.getUnavailableFields(Engine, board) shouldBe empty
-    BasicRulesGame.getUnavailableFields(Engine, board) shouldBe empty
+    getOnlyUnavailable(BasicRulesGame.updateAvailabilityOfFields(Engine, board)) shouldBe empty
+    getOnlyUnavailable(BasicRulesGame.updateAvailabilityOfFields(Engine, board)) shouldBe empty
+  }
+
+  private def getOnlyUnavailable(fields: Set[FreeField]): Set[Unavailable] = {
+    fields filter {field => field.isInstanceOf[Unavailable]} map {field => field.asInstanceOf[Unavailable]}
   }
 }

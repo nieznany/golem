@@ -10,6 +10,23 @@ import com.github.golem.model.GameState.MovesHistory
 
 class basic_rules_game_make_move_test extends GolemUnitSpec {
 
+  "A game" should "remove one stone" in {
+    val board = Board(Seq(
+      ".o..",
+      "ox..",
+      ".o.."))
+    val move = Put(Stone(Coords(2, 3), Human))
+    val gameState = new GameState(board)
+
+    val newState = BasicRulesGame.makeMove(Pass(Engine), gameState)
+    val newState2 =  BasicRulesGame.makeMove(move, gameState)
+    newState2.board should be (Board(Seq(
+      "Xo..",
+      "oXo.",
+      "Xo.."
+    )))
+  }
+
   "A game" should "recognize death eyes" in {
     val board = Board(Seq(
       "ooooo",

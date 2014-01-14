@@ -22,7 +22,7 @@ object BasicRulesGame extends Game {
         val newFreeFields = getEndangeredStones(p, state.board) map (stone => stone.toFree)
 
         val state1 = ((state ++ p) ++ newFreeFields) // Breath rule
-        val state2 = state1 ++ getUnavailableFields(opponent, state1.board) // Add (very useful) information, which fields are unavailable for player.
+        val state2 = state1 ++ updateAvailabilityOfFields(opponent, state1.board) // Add (very useful) information, which fields are unavailable for player.
 
         // Ko rule.
         if (newFreeFields.size == 1) {
@@ -94,6 +94,30 @@ object BasicRulesGame extends Game {
   def getChain(memberCoords: Coords, board: Board): Option[Chain] = {
     val member = board(memberCoords)
     getChain(member, board)
+  }
+
+  def getNonEmptyChain(memberCoords: Coords, board: Board): Chain = {
+    getChain(memberCoords, board) match {
+      case Some(chain) => chain
+      case None => throw new IllegalArgumentException(s"$memberCoords, does not point to any chain at $board")
+    }
+  }
+
+  def isGhostChain(chain: Chain, board: Board): Boolean = {
+    chain.fields foreach { field =>
+      board(field.position) match {
+        case _: Stone => return false
+        case _ => {}
+      }
+    }
+    true
+  }
+
+  def getNeighbourStones(coords: Coords, player:Player, board: Board): Set[Stone] = {
+    getNeighbourFields(coords, board) filter {
+      case Stone(_, owner) => owner == player
+      case _ => false
+    } map {field => field.asInstanceOf[Stone]}
   }
 
   def getNeighbourFields(coords: Coords, board: Board): Set[Field] = {
@@ -175,7 +199,7 @@ object BasicRulesGame extends Game {
    * @return fields, which are not available for $currentPlayer (if currently he makes move).
    *         TODO maybe should include fields, which will be not avaialble in next move?
    */
-  def getUnavailableFields(currentPlayer: Player, board: Board): Set[FreeField] = {
+  def updateAvailabilityOfFields(currentPlayer: Player, board: Board): Set[FreeField] = {
     val fields = scala.collection.mutable.Set[FreeField]()
     for (r <- 1 to board.nrows) {
       for (c <- 1 to board.ncolumns) {
