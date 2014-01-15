@@ -6,53 +6,23 @@ import com.github.golem.command.game.{GenerateMove, MadeMove}
 import com.github.golem.command.Informative
 import com.github.golem.command.Command
 import akka.event.{LoggingAdapter, Logging}
+import akka.dispatch._
+import scala.concurrent.{ExecutionContext, Await, Future}
+import ExecutionContext.Implicits.global
+import akka.pattern.ask
+import scala.concurrent.duration._
 import com.github.golem.command.setup.{SetKomi, QuitGame, SetBoardSize}
 import com.github.golem.model.Pass
 import scala.Some
 import com.github.golem.model.Board.{FreeField, Stone, Coords}
 import com.github.golem.model.BasicRulesGame.Chain
-import com.github.golem.army.Commander.Subordinates
+import com.github.golem.army.model.Subordinates
+import com.github.golem.army.command.{Objective, SuggestMove}
+import scala.concurrent.{Await, Future}
+import akka.util.Timeout
 
 object Commander {
   def props = Props(classOf[Commander])
-
-  /**
-   * Bidirectional map for subordinate <-> one of positions (stones) on board
-   */
-  case class Subordinates(private val referenceStones: Map[ActorRef, Stone] = Map[ActorRef, Stone](),
-                          private val subordinatesMap: Map[Coords, ActorRef] = Map[Coords, ActorRef]()) {
-
-    def getActors: Set[ActorRef] = referenceStones.keySet
-
-    def getReferenceStoneFor(actor: ActorRef): Stone = referenceStones(actor)
-
-    def getSubordinateFor(coords: Coords): Option[ActorRef] = subordinatesMap.get(coords)
-
-    def +(acs: Iterable[(ActorRef, Chain)]): Subordinates = {
-      var newRefPositions = referenceStones
-      var newSubMap = subordinatesMap
-      for (ac <- acs) {
-        newRefPositions += (ac._1 -> ac._2.fields.head)
-        newSubMap ++= (for (stone <- ac._2.fields) yield (stone.position -> ac._1))
-      }
-      Subordinates(newRefPositions, newSubMap)
-    }
-
-    def -(actors: Set[ActorRef]): Subordinates = {
-      var newSubMap = subordinatesMap
-      var newRefPositions = referenceStones
-        for (kv <- subordinatesMap) {
-          // FIX very inefficient, but most general (it will actually remove all actor's stones) - what to do with this method?
-          if(actors.contains(kv._2))
-            newSubMap -= kv._1
-        }
-      for(actor <- actors)
-        newRefPositions -= actor
-      Subordinates(newRefPositions, newSubMap)
-    }
-
-  }
-
 }
 
 class Commander extends GolemActor {
@@ -60,12 +30,12 @@ class Commander extends GolemActor {
   import context._
 
   /** Identity of commander */
-  val identity: Player = Engine
   private val LOG = Logging(system, this)
-  private val game = BasicRulesGame
   // IDEA: handle other types of rules
   private var currentGameState: Option[GameState] = None
   private var subordinates: Subordinates = new Subordinates
+
+  implicit val timeout = Timeout(10 seconds)
 
   def handle(message: Any) = {
     message match {
@@ -82,7 +52,7 @@ class Commander extends GolemActor {
           }
 
           case QuitGame => {
-            LOG.info(s"Finishing game, result state: $currentGameState")
+            LOG.info(s"Game is finished, result state: $currentGameState")
             subordinates.getActors foreach (subordinate => subordinate ! PoisonPill)
             currentGameState = None
             subordinates = Subordinates()
@@ -97,8 +67,27 @@ class Commander extends GolemActor {
       case cmd: Command => {
         cmd match {
           case GenerateMove => {
-            // TODO - do something
-            sender ! GenerateMove.Response(Pass(identity))
+            val answersFutureList = Future.traverse(subordinates.getActors) {
+              actor => actor.ask(SuggestMove(getGameState, subordinates))
+            }
+            val result = Await.result(answersFutureList, timeout.duration)
+
+            val moves = result filter {
+              result => result.isInstanceOf[SuggestMove.Response]
+            } map {
+              result => result.asInstanceOf[SuggestMove.Response]
+            } // FIX inefficient, how to filter and map at once?
+
+            val bestMove = (moves + suggestMove) reduceLeft {
+              (m1, m2) => {
+                chooseBetter(m1, m2)
+              }
+            }
+            sender ! GenerateMove.Response(bestMove.move)
+
+            updateFor(bestMove.move)
+            LOG.info(s"New game state: $currentGameState") // TODO change to debug
+            LOG.info(s"$subordinates")
           }
         }
       }
@@ -106,6 +95,12 @@ class Commander extends GolemActor {
         LOG.warning(s"I saw UFO: $ufo. I will ignore it...")
       }
     }
+  }
+
+  def chooseBetter(answer1: SuggestMove.Response, answer2: SuggestMove.Response): SuggestMove.Response = answer1// TODO change that
+
+  def suggestMove: SuggestMove.Response = {
+    SuggestMove.Response(Pass(identity), Objective(None)) // TODO change that
   }
 
   /**

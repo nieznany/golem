@@ -12,7 +12,7 @@ import akka.actor.{Props, Actor}
 import scala.concurrent.duration.Duration
 import com.github.golem.command.administrative.{ListCommands, GetVersion, GetName, StartClient}
 import akka.event.Logging
-import akka.pattern.ask
+import akka.pattern.{ask, pipe}
 import akka.util.Timeout
 import com.github.golem.command.tournament.{TimeLeft, DeadFinalStatusList}
 import com.github.golem.command.game.{MadeMove, GenerateMove}
@@ -24,16 +24,6 @@ import com.github.golem.command.game.MadeMove
 import com.github.golem.model.Pass
 import com.github.golem.model.Board.{Coords, Stone}
 import com.github.golem.army.Commander
-
-object KgsClient {
-  def props(properties: Properties, logFilename: String) = Props(classOf[KgsClient], properties, logFilename)
-
-  def props(propertiesFileName: String, logFilename: String): Props = {
-    val p = new Properties()
-    p load new FileInputStream(propertiesFileName)
-    KgsClient.props(p, logFilename)
-  }
-}
 
 /**
  * KGS GTP (Go Text Protocol) scala wrapper.
@@ -223,7 +213,7 @@ class KgsClient(properties: Properties, logFilename: String) extends Actor {
     }
   }
 
-  private val missingBoardColumnChar = 'j'
+  private val missingBoardColumnChar = 'i'
   private val missingBoardColumnNumber = missingBoardColumnChar - 'a' + 1
   private def getBoardColumn(columnSign: Char):Int = {
     columnSign match {
@@ -248,4 +238,14 @@ class KgsClient(properties: Properties, logFilename: String) extends Actor {
   def sendVersion: Unit = sendResponse(new GetVersion.Response(VERSION))
 
 
+}
+
+object KgsClient {
+  def props(properties: Properties, logFilename: String) = Props(classOf[KgsClient], properties, logFilename)
+
+  def props(propertiesFileName: String, logFilename: String): Props = {
+    val p = new Properties()
+    p load new FileInputStream(propertiesFileName)
+    KgsClient.props(p, logFilename)
+  }
 }

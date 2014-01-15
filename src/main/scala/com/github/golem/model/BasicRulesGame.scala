@@ -96,6 +96,7 @@ object BasicRulesGame extends Game {
     getChain(member, board)
   }
 
+  @throws[IllegalArgumentException]("If selected field is not a stone.")
   def getNonEmptyChain(memberCoords: Coords, board: Board): Chain = {
     getChain(memberCoords, board) match {
       case Some(chain) => chain
