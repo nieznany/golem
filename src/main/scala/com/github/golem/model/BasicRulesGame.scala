@@ -105,20 +105,40 @@ object BasicRulesGame extends Game {
   }
 
   def isGhostChain(chain: Chain, board: Board): Boolean = {
-    chain.fields foreach { field =>
-      board(field.position) match {
-        case _: Stone => return false
-        case _ => {}
-      }
+    chain.fields foreach {
+      field =>
+        board(field.position) match {
+          case _: Stone => return false
+          case _ => {}
+        }
     }
     true
   }
 
-  def getNeighbourStones(coords: Coords, player:Player, board: Board): Set[Stone] = {
+  def getNeighbourStones(coords: Coords, player: Player, board: Board): Set[Stone] = {
     getNeighbourFields(coords, board) filter {
       case Stone(_, owner) => owner == player
       case _ => false
-    } map {field => field.asInstanceOf[Stone]}
+    } map {
+      field => field.asInstanceOf[Stone]
+    }
+  }
+
+  def getChainNeighbourFields(chain: Chain, player: Player, board: Board): Set[Coords] = {
+    val neighbours = scala.collection.mutable.Set[Coords]()
+    for (stone <- chain.fields) {
+      val neighbourFreeFields = getRegionNeighbourFields(stone.position, player, board)
+      neighbourFreeFields foreach (field => neighbours.add(field.position))
+    }
+    return neighbours.toSet
+  }
+
+  def getRegionNeighbourFields(coords: Coords, player: Player, board: Board): Set[Field] = {
+    getNeighbourFields(coords, board) filter {
+      case Stone(_, owner) => owner != player
+      case Free(_) => true
+      case _ => false
+    }
   }
 
   def getNeighbourFields(coords: Coords, board: Board): Set[Field] = {
@@ -137,7 +157,7 @@ object BasicRulesGame extends Game {
   def isLegal(move: Move, state: GameState): Boolean = {
     move match {
       case Put(Stone(Coords(r, c), owner)) => {
-        if(state.board.isOutOfBounds(r, c))
+        if (state.board.isOutOfBounds(r, c))
           return false
 
         val field = state.board(r, c)
@@ -230,6 +250,87 @@ object BasicRulesGame extends Game {
     fields.toSet
   }
 
+  def isGroupAlive(chains: Set[Chain], board: Board): Boolean = {
+    var regionsMap = scala.collection.mutable.Map[Int, Set[Coords]]()
+    var chainsMap = scala.collection.mutable.Map[Int, Chain]()
+    var chainsToRegionsMap = scala.collection.mutable.Map[Int, scala.collection.mutable.Set[Int]]()
+    var regionsToChainsMap = scala.collection.mutable.Map[Int, scala.collection.mutable.Set[Int]]()
+
+
+    chains foreach (chain => chainsMap += chainsMap.size -> chain)
+
+    if (chains isEmpty) {
+      throw new Exception("Trying to evaluate group with no chains")
+    }
+    val player = chains.head.fields.head.owner
+    for ((chainKey, chain) <- chainsMap) {
+      val neighbourCoords = getChainNeighbourFields(chain, Engine, board)
+      for (coord <- neighbourCoords) {
+        var found: Boolean = false
+        for ((regionKey, region) <- regionsMap) {
+          if (region.contains(coord)) {
+            found = true
+            regionsToChainsMap.get(regionKey) match {
+              case None => regionsToChainsMap += regionKey -> scala.collection.mutable.Set(chainKey)
+              case Some(set) => set += chainKey
+            }
+            if (region.subsetOf(neighbourCoords)) {
+              chainsToRegionsMap.get(chainKey) match {
+                case None => chainsToRegionsMap += chainKey -> scala.collection.mutable.Set(regionKey)
+                case Some(set) => set += regionKey
+              }
+            }
+          }
+        }
+        if (!found) {
+          val traverser = new RegionTraverser(board, player)
+          traverser.growRegion(coord)
+          val regionId = regionsMap.size
+          regionsMap += regionId -> traverser.region
+          regionsToChainsMap += regionId -> scala.collection.mutable.Set(chainKey)
+          if (traverser.region.subsetOf(neighbourCoords)) {
+            chainsToRegionsMap.get(chainKey) match {
+              case None => chainsToRegionsMap += chainKey -> scala.collection.mutable.Set(regionId)
+              case Some(set) => set += regionId
+            }
+          }
+        }
+      }
+    }
+
+    var compromisedRegions = scala.collection.mutable.Set[Int]()
+    var compromisedChains = scala.collection.mutable.Set[Int]()
+    var sthChanged = false;
+    do {
+      sthChanged = false;
+      for ((key, chain) <- chainsMap) {
+        chainsToRegionsMap.get(key) match {
+          case Some(set) => {
+            compromisedRegions foreach (regionId => set.remove(regionId))
+            if (set.size < 2) {
+              compromisedChains += key;
+              chainsToRegionsMap.remove(key);
+              sthChanged = true;
+            }
+          }
+          case None => {}
+        }
+      }
+      for ((key, region) <- regionsMap) {
+        regionsToChainsMap.get(key) match {
+          case Some(set) => set foreach (chainId => if (compromisedChains.contains(chainId)) {
+            sthChanged = true;
+            compromisedRegions += key
+            set.remove(chainId)
+          })
+          case None => {}
+        }
+      }
+    } while (sthChanged)
+
+    return compromisedChains.isEmpty
+  }
+
   private class ChainTraverser(board: Board,
                                player: Player,
                                var chainFields: Set[Stone] = Set[Stone](),
@@ -263,6 +364,19 @@ object BasicRulesGame extends Game {
     }
 
     def getChain = if (chainFields.isEmpty) None else Some(Chain(chainFields, breaths))
+  }
+
+  private class RegionTraverser(board: Board, player: Player, var region: Set[Coords] = Set[Coords]()) {
+
+    def growRegion(coords: Coords): Unit = {
+      region += coords
+      for (field <- getRegionNeighbourFields(coords, player, board)) {
+        if (!region.contains(field.position)) {
+          region += field.position
+          growRegion(field.position)
+        }
+      }
+    }
   }
 
 }

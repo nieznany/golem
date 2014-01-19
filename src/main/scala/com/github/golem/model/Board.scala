@@ -22,6 +22,7 @@ object Board {
 
   trait Disabled
 
+  //FIXME trait never used
   trait Empty
 
   case class Border(override val position: Coords) extends Field with Disabled
