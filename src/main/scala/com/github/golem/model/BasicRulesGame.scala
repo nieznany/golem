@@ -156,7 +156,7 @@ object BasicRulesGame extends Game {
 
   def isLegal(move: Move, state: GameState): Boolean = {
     move match {
-      case Put(Stone(Coords(r, c), owner)) => {
+      case Put(Stone(Coords(r, c), owner)) =>
         if (state.board.isOutOfBounds(r, c))
           return false
 
@@ -166,7 +166,6 @@ object BasicRulesGame extends Game {
           case ff: FreeField => true
           case _ => false
         }
-      }
       case _ => true
     }
   }
@@ -250,6 +249,12 @@ object BasicRulesGame extends Game {
     fields.toSet
   }
 
+  /**
+   * Checks if given group of chains is unconditionally alive. Based on Benson's algorithm.
+   * @param chains set of chains forming 1 group
+   * @param board current board
+   * @return true if all chains are alive, otherwise false
+   */
   def isGroupAlive(chains: Set[Chain], board: Board): Boolean = {
     var regionsMap = scala.collection.mutable.Map[Int, Set[Coords]]()
     var chainsMap = scala.collection.mutable.Map[Int, Chain]()
@@ -264,7 +269,7 @@ object BasicRulesGame extends Game {
     }
     val player = chains.head.fields.head.owner
     for ((chainKey, chain) <- chainsMap) {
-      val neighbourCoords = getChainNeighbourFields(chain, Engine, board)
+      val neighbourCoords = getChainNeighbourFields(chain, player, board)
       for (coord <- neighbourCoords) {
         var found: Boolean = false
         for ((regionKey, region) <- regionsMap) {
@@ -300,35 +305,34 @@ object BasicRulesGame extends Game {
 
     var compromisedRegions = scala.collection.mutable.Set[Int]()
     var compromisedChains = scala.collection.mutable.Set[Int]()
-    var sthChanged = false;
+    var sthChanged = false
     do {
-      sthChanged = false;
+      sthChanged = false
       for ((key, chain) <- chainsMap) {
         chainsToRegionsMap.get(key) match {
-          case Some(set) => {
+          case Some(set) =>
             compromisedRegions foreach (regionId => set.remove(regionId))
             if (set.size < 2) {
-              compromisedChains += key;
-              chainsToRegionsMap.remove(key);
+              compromisedChains += key
+              chainsToRegionsMap.remove(key)
               sthChanged = true;
             }
-          }
-          case None => {}
+          case None =>
         }
       }
       for ((key, region) <- regionsMap) {
         regionsToChainsMap.get(key) match {
           case Some(set) => set foreach (chainId => if (compromisedChains.contains(chainId)) {
-            sthChanged = true;
+            sthChanged = true
             compromisedRegions += key
             set.remove(chainId)
           })
-          case None => {}
+          case None =>
         }
       }
     } while (sthChanged)
 
-    return compromisedChains.isEmpty
+    compromisedChains.isEmpty
   }
 
   private class ChainTraverser(board: Board,

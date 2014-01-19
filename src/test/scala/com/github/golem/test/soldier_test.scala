@@ -1,10 +1,10 @@
 package com.github.golem.test
 
 import com.github.golem.model._
-import com.github.golem.model.Board._
-import com.github.golem.model.Put
+import akka.testkit.TestActorRef
+import com.github.golem.army.Soldier
+import com.github.golem.model.Board.Free
 import com.github.golem.model.Board.Coords
-import com.github.golem.model.Board.Stone
 
 class soldier_test extends GolemActorUnitSpec {
   val board1 = Board(Seq(
@@ -21,34 +21,20 @@ class soldier_test extends GolemActorUnitSpec {
     "x.xx",
     "..x."))
 
-  "A game " should "select field's neighbours except for stones of the same player" in {
-    val fields = BasicRulesGame getRegionNeighbourFields (Coords(2, 2), Engine, board2)
+  "A Soldier" should "suggest best move accordingly to max liberties increase" in {
+    val testActor = TestActorRef(new Soldier, "soldier1")
+    val soldier = testActor.underlyingActor
+    val chain1 = BasicRulesGame getNonEmptyChain(Coords(2, 6), board1)
+    val chain2 = BasicRulesGame getNonEmptyChain(Coords(2, 2), board1)
+    val chain3 = BasicRulesGame getNonEmptyChain(Coords(2, 2), board2)
 
-    fields should contain theSameElementsAs Vector(Stone(Coords(1,2),Human),Free(Coords(2,3)), Free(Coords(3,2)))
+    val move1 = soldier getBestMove(chain1, board1)
+    val move2 = soldier getBestMove(chain2, board1)
+    val move3 = soldier getBestMove(chain3, board2)
+
+    move1 should be(Some(Free(Coords(3, 5))))
+    move2 should be(Some(Free(Coords(2, 4))))
+    move3 should be(Some(Free(Coords(2, 3))))
   }
-
-  "A game " should "select chain's neighbours except for stones of the same player " in {
-    val chain = BasicRulesGame getNonEmptyChain(Coords(2,2),board2)
-    val fields = BasicRulesGame getChainNeighbourFields (chain, Engine, board2)
-
-    fields should contain theSameElementsAs Vector(Coords(1,1),Coords(1,2),Coords(2,3),Coords(3,2),Coords(4,1))
-  }
-
-  "A game" should "tell if given group of chains is alive" in {
-    val chain1 = BasicRulesGame getNonEmptyChain (Coords(1, 1), board1)
-    val chain2 = BasicRulesGame getNonEmptyChain (Coords(2, 2), board1)
-    val chain3 = BasicRulesGame getNonEmptyChain (Coords(5, 3), board1)
-    val chain4 = BasicRulesGame getNonEmptyChain (Coords(6, 4), board1)
-    val chain5 = BasicRulesGame getNonEmptyChain (Coords(1, 5), board1)
-    var resFalse = BasicRulesGame isGroupAlive(Set(chain1,chain2,chain3,chain4,chain5),board1)
-    var resTrue = BasicRulesGame isGroupAlive(Set(chain1,chain2),board1)
-    for(i <- (1 to 100)){
-      resFalse = BasicRulesGame isGroupAlive(Set(chain1,chain2,chain3,chain4,chain5),board1)
-    }
-    resFalse should be (false);
-    resTrue should be(true)
-  }
-
-
 
 }

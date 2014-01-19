@@ -1,15 +1,12 @@
 package com.github.golem.army
 
-import akka.actor.{Props, Actor}
+import akka.actor.Props
 import akka.event.{LoggingAdapter, Logging}
 import com.github.golem.army.command.{Objective, SuggestMove}
-import com.github.golem.model._
-import com.github.golem.model.Board.{Stone, Free}
-import com.github.golem.model.Put
-import com.github.golem.model.Board.Free
-import com.github.golem.model.Pass
+import com.github.golem.model.{Board, Put, Pass}
+import com.github.golem.model.Board.{FreeField, Stone}
 import scala.Some
-import com.github.golem.model.Board.Stone
+import com.github.golem.model.BasicRulesGame.Chain
 
 object Soldier {
   def name = "soldier"
@@ -28,17 +25,36 @@ class Soldier extends GolemActor {
   def handle(message: Any): Unit = {
     message match {
       case SuggestMove(gameState, siblings) => {
-        // TODO mniej trywialne rozwiazanie
         val referenceStone = siblings.getReferenceStoneFor(self)
         val currentBoard = gameState.board
         val myChain = game.getNonEmptyChain(referenceStone.position, currentBoard)
-        val freeBreath = myChain.breaths find (field => field.isInstanceOf[Free])
-        val myMove = freeBreath match {
+
+        val myMove = getBestMove(myChain, gameState.board) match {
           case Some(freeField) => Put(Stone(freeField.position, identity))
           case None => Pass(identity)
         }
         sender ! SuggestMove.Response(myMove, Objective(Some(myChain)))
       }
     }
+  }
+
+  /**
+   * choose move that will get for the chain the most liberties 
+   */
+  def getBestMove(myChain: Chain, currentBoard: Board): Option[FreeField] = {
+    val breathsCoords = (for (breath <- myChain.breaths) yield breath.position).toSet
+    var currentMaxSize = breathsCoords.size
+    var bestMove: Option[FreeField] = None
+    LOG.info("suggesting move, current breaths:" + currentMaxSize)
+    for (breath <- myChain.breaths) {
+      val neighbourFreeFields = game.getNeighbourFreeFields(breath.position, currentBoard)
+      val newSize: Int = breathsCoords.size + neighbourFreeFields.size - 1
+      LOG.info("considered size:" + newSize)
+      if (newSize > currentMaxSize) {
+        bestMove = Some(breath)
+        currentMaxSize = newSize
+      }
+    }
+    bestMove
   }
 }
