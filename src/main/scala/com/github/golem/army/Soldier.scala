@@ -14,13 +14,7 @@ object Soldier {
   def props = Props(classOf[Soldier])
 }
 
-class Soldier extends GolemActor {
-
-  import context._
-
-  val LOG = Logging(system, this)
-
-  def getLogger: LoggingAdapter = LOG
+class Soldier extends Private {
 
   def handle(message: Any): Unit = {
     message match {
@@ -36,25 +30,5 @@ class Soldier extends GolemActor {
         sender ! SuggestMove.Response(myMove, Objective(Some(myChain)))
       }
     }
-  }
-
-  /**
-   * choose move that will get for the chain the most liberties 
-   */
-  def getBestMove(myChain: Chain, currentBoard: Board): Option[FreeField] = {
-    val breathsCoords = (for (breath <- myChain.breaths) yield breath.position).toSet
-    var currentMaxSize = breathsCoords.size
-    var bestMove: Option[FreeField] = None
-    LOG.info("suggesting move, current breaths:" + currentMaxSize)
-    for (breath <- myChain.breaths) {
-      val neighbourFreeFields = game.getNeighbourFreeFields(breath.position, currentBoard)
-      val newSize: Int = breathsCoords.size + neighbourFreeFields.size - 1
-      LOG.info("considered size:" + newSize)
-      if (newSize > currentMaxSize) {
-        bestMove = Some(breath)
-        currentMaxSize = newSize
-      }
-    }
-    bestMove
   }
 }

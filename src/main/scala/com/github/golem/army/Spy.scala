@@ -11,22 +11,16 @@ object Spy {
   def props = Props(classOf[Spy])
 }
 
-class Spy extends GolemActor {
-  import context._
-
-  val LOG = Logging(system, this)
-
-  def getLogger: LoggingAdapter = LOG
+class Spy extends Private {
 
   def handle(message: Any): Unit = {
     message match {
       case SuggestMove(gameState, siblings) => {
-        // TODO mniej trywialne rozwiazanie
         val referenceStone = siblings.getReferenceStoneFor(self)
         val currentBoard = gameState.board
         val myChain = game.getNonEmptyChain(referenceStone.position, currentBoard)
-        val freeBreath = myChain.breaths find (field => field.isInstanceOf[Free])
-        val myMove = freeBreath match {
+
+        val myMove = getBestMove(myChain, gameState.board) match {
           case Some(freeField) => Put(Stone(freeField.position, identity))
           case None => Pass(identity)
         }
