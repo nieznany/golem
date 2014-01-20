@@ -67,7 +67,7 @@ class commander_test extends GolemActorUnitSpec {
 //    testActor ! MadeMove(Put(Stone(Coords(2,3), Engine)))
 //  }
 
-  "A commander" should "split two captains" in {
+  "A commander" should "join and then split two captains" in {
     val testActor = TestActorRef(new Commander, "commander3")
     testActor ! SetBoardSize(9)
     testActor ! MadeMove(Put(Stone(Coords(1,1), Human)))

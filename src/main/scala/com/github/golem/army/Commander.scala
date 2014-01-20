@@ -189,8 +189,8 @@ class Commander extends GolemActor {
         // We need to split new groups between captains.
         killCaptain(captain)
         for (group <- captainGroups) {
-          createCaptain(group)
-          captains = captains.addGroups(Seq((captain, group)))
+          val newCaptain = createCaptain(group)
+          captains = captains.addGroups(Seq((newCaptain, group)))
         }
       }
     }
@@ -272,9 +272,15 @@ class Commander extends GolemActor {
             if (!board.isOutOfBounds(furtherPosition.row, furtherPosition.column)) {
               captains.getSubordinateFor(furtherPosition) match {
                 case Some(furtherActor) => {
-                  board(furtherPosition) match {
-                    // FIXME duplication of code
-                    case Stone(_, stone.owner) => neighbourCaptains += furtherActor
+                  board(neighbourPosition) match {
+                    case _: FreeField => {
+                      // groups are separated by free fields.
+                      board(furtherPosition) match {
+                        // FIXME duplication of code
+                        case Stone(_, stone.owner) => neighbourCaptains += furtherActor
+                        case _ => {}
+                      }
+                    }
                     case _ => {}
                   }
                 }
@@ -333,7 +339,15 @@ class Commander extends GolemActor {
   }
 
   private def createSubordinateName(subordType: String, position: Coords) = {
-    s"${subordType}_${position.row}_${position.column}_${getGameState.history.moves.size}"
+    s"${
+subordType
+}_${
+position.row
+}_${
+position.column
+}_${
+getGameState.history.moves.size
+}"
   }
 
   def getLogger: LoggingAdapter = LOG
