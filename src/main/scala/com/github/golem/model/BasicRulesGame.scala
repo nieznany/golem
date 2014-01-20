@@ -6,16 +6,42 @@ import com.github.golem.model.Board._
 // TODO how to avoid parameter 'state' in each method? Choose one of the possibilities
 object BasicRulesGame extends Game {
 
+  // TODO extract below goodies to some file
   case class Chain(fields: Set[Stone], breaths: Set[FreeField])
+
+  case class Group(chains: Set[Chain])
+
+  object BoardDecomposition {
+    def apply(groups: Set[Group]): BoardDecomposition = {
+      var groupMap = scala.collection.mutable.Map[Coords, Group]()
+      var chainMap = scala.collection.mutable.Map[Coords, Chain]()
+      for (group <- groups) {
+        for (chain <- group.chains) {
+          for (field <- chain.fields) {
+            groupMap += (field.position -> group)
+            chainMap += (field.position -> chain)
+          }
+        }
+      }
+      BoardDecomposition(groupMap.toMap, chainMap.toMap)
+    }
+  }
+
+  case class BoardDecomposition(groupMap: Map[Coords, Group],
+                                chainMap: Map[Coords, Chain] /* Redundant, but improves efficiency*/)
+
 
   val DIRECTIONS = List(N, S, W, E)
 
   def makeMove(move: Move, state: GameState): GameState = {
+
     move match {
       case _: Pass => state + move
       case p: Put => {
         if (!isLegal(move, state))
           throw new IllegalMoveException(p)
+
+        // TODO use (somehow) board decomposition starting from here
 
         val opponent = p.stone.owner.opponent() // We are making game state for this player.
 
@@ -32,12 +58,47 @@ object BasicRulesGame extends Game {
           val nextEndangeredFields = getEndangeredStones(new Put(newFreeFields.head, opponent), state2.board)
           if (nextEndangeredFields.size == 1 && nextEndangeredFields.contains(p.stone)) {
             // In next move there will be possibility to reverse back board () suspicious Field should be unavailable
-            return state2 + new Unavailable(suspiciousField, opponent)
+            val state3 = state2 + new Unavailable(suspiciousField, opponent)
+            return state3  ++ decomposeBoard(state3.board)
           }
         }
-        state2
+        state2 //++ decomposeBoard(state2.board)
       }
     }
+  }
+
+  def decomposeBoard(board: Board): Board = {
+    val visitedStones = scala.collection.mutable.Set[Stone]()
+    val groups = scala.collection.mutable.Set[Group]()
+    for (i <- 1 to board.nrows) {
+      for (j <- 1 to board.ncolumns) {
+        val field = board(i, j)
+        field match {
+          case s: Stone => {
+            if(! visitedStones.contains(s)) {
+              val groupChains = scala.collection.mutable.Set[Chain]()
+              val groupTraverser = new GroupTraverser(board, s.owner)
+              groupTraverser.traverse(s)
+              val groupStones = groupTraverser.groupStones
+              // FIXME this is quite inefficient - the same set of stones is traversed twice
+              for(groupStone <- groupStones) {
+                if(! visitedStones.contains(groupStone)) {
+                  val chainTraverser = new ChainTraverser(board, groupStone.owner)
+                  chainTraverser.traverse(groupStone)
+                  val chain = chainTraverser.getNonEmptyChain
+                  groupChains += chain
+                  visitedStones ++= chain.fields
+                }
+              }
+              groups += Group(groupChains.toSet)
+            }
+          }
+          case _ => {}
+        }
+      }
+    }
+    board.setDecomposition(BoardDecomposition(groups.toSet))
+    board
   }
 
   /**
@@ -182,7 +243,7 @@ object BasicRulesGame extends Game {
     val endangeredOpponentChains = getEndangeredChains(fakeMove, board)
     if (!endangeredOpponentChains.isEmpty) return false // Yes!
     // If no, check, whether this is suicide move
-    val playerChain = getChain(coords, board + fakeMove.stone) // TODO very inefficient, copying whole board!
+    val playerChain = getChain(coords, board + fakeMove.stone) // TODO veeeeeeeery inefficient, copying whole board!
     playerChain match {
       case Some(chain) => {
         chain.breaths.isEmpty
@@ -211,7 +272,7 @@ object BasicRulesGame extends Game {
    *         belongs to owner of the stone placed at $memberCoords.
    *         Equals None, when given field is not a Stone.
    */
-  // TODO should be optimized, i.e store chains in GameState object
+  // TODO use (somehow) board decomposition
   private def getChain(member: Field, board: Board): Option[Chain] = {
     member match {
       case s: Stone => {
@@ -362,12 +423,45 @@ object BasicRulesGame extends Game {
           case f: FreeField => {
             breaths += f
           }
-          case _: Field => 0 // NOP
+          case _: Field => {} // NOP
         }
       }
     }
 
     def getChain = if (chainFields.isEmpty) None else Some(Chain(chainFields, breaths))
+    def getNonEmptyChain = {
+      getChain match {
+        case Some(chain) => chain
+        case None => throw new Exception("chain not found")
+      }
+    }
+  }
+  
+  // TODO refactor - duplicated code - extract base class for Group and ChainTraverser
+  private class GroupTraverser(board: Board,
+                               player: Player,
+                               var groupStones: Set[Stone] = Set[Stone]()) {
+
+    private var visitedFields = Set[Field]()
+
+    def traverse(field: Field): Unit = {
+      if (!visitedFields.contains(field)) {
+        visitedFields += field
+        field match {
+          case s: Stone => {
+            if (s.owner == player) {
+              groupStones += s
+              DIRECTIONS foreach (direction => traverse(board(field.position + direction)))
+              traverse(s)
+            }
+          }
+          case f: FreeField => {
+            DIRECTIONS map (direction => board(field.position + direction)) filter (field => field.isInstanceOf[Stone] && field.asInstanceOf[Stone].owner == player) foreach(stone => traverse(stone))
+          }
+          case _: Field => {} // NOP
+        }
+      }
+    }
   }
 
   private class RegionTraverser(board: Board, player: Player, var region: Set[Coords] = Set[Coords]()) {

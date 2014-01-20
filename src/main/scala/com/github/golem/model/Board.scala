@@ -2,6 +2,7 @@ package com.github.golem.model
 
 
 import com.github.golem.model.Board._
+import com.github.golem.model.BasicRulesGame.BoardDecomposition
 
 object Board {
   val N = Coords(-1, 0)
@@ -79,10 +80,12 @@ object Board {
 }
 
 /**
- * Must be immutable.
  * Numerated from 1 to nrows and from 1 to ncolumns (inclusive in both)
  */
 case class Board private(nrows: Int, ncolumns: Int, fields: Map[Coords, Field]) {
+  private var decomposition: Option[BoardDecomposition] = None/*TODO is it good place to store board decomposition?*/
+  def setDecomposition(d: BoardDecomposition) = this.decomposition = Some(d)
+  def getDecomposition = this.decomposition
 
   /**
    * Tests wheter given coordinates are out of bounds (including border)
@@ -104,12 +107,12 @@ case class Board private(nrows: Int, ncolumns: Int, fields: Map[Coords, Field]) 
 
   def apply(coords: Coords): Field = apply(coords.row, coords.column)
 
-  def +(field: Field): Board = this.copy(fields = this.fields + (field.position -> field))
-
   /**
    * Returns true, if selected field is of type Disabled, otherwise false.
    */
   def isDisabled(coords: Coords): Boolean = this(coords).isInstanceOf[Disabled]
+
+  def +(field: Field): Board = this.copy(fields = this.fields + (field.position -> field))
 
   /**
    * Will update field, if already exists.

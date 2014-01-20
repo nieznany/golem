@@ -7,9 +7,10 @@ import org.scalatest._
 import Matchers._
 
 class basic_rules_game_get_chain_test extends GolemUnitSpec {
-  val board1 = Board(Seq("x.x.x",
+  var board1 = Board(Seq("x.x.x",
                          "oo.xx",
                          ".ooox"))
+  board1 = BasicRulesGame.decomposeBoard(board1)
 
    "A game" should "declare long chain of engine stones" in {
       val chain = BasicRulesGame getChain (Coords(2, 4), board1)

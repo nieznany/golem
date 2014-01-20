@@ -2,6 +2,7 @@ package com.github.golem.model
 
 import com.github.golem.model.Board.Field
 import com.github.golem.model.GameState.MovesHistory
+import com.github.golem.model.BasicRulesGame.BoardDecomposition
 
 object GameState {
   case class MovesHistory(moves: List[Move]) {
@@ -19,9 +20,12 @@ object GameState {
 }
 
 case class GameState(history: MovesHistory, board: Board) {
+
   def this(board: Board) = {
     this(new MovesHistory(), board)
   }
+
+  def ++(newBoard: Board): GameState = copy(board = newBoard)
   /**
    * Updates only list of moves.
    *
