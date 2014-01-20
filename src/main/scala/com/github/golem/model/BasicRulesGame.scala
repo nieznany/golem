@@ -62,7 +62,7 @@ object BasicRulesGame extends Game {
             return state3  ++ decomposeBoard(state3.board)
           }
         }
-        state2 //++ decomposeBoard(state2.board)
+        state2 ++ decomposeBoard(state2.board)
       }
     }
   }

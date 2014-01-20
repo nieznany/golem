@@ -2,7 +2,7 @@ package com.github.golem.model
 
 
 import com.github.golem.model.Board._
-import com.github.golem.model.BasicRulesGame.BoardDecomposition
+import com.github.golem.model.BasicRulesGame.{Group, Chain, BoardDecomposition}
 
 object Board {
   val N = Coords(-1, 0)
@@ -86,6 +86,32 @@ case class Board private(nrows: Int, ncolumns: Int, fields: Map[Coords, Field]) 
   private var decomposition: Option[BoardDecomposition] = None/*TODO is it good place to store board decomposition?*/
   def setDecomposition(d: BoardDecomposition) = this.decomposition = Some(d)
   def getDecomposition = this.decomposition
+  def getDecomposedNonEmptyChain(coords: Coords): Chain = {
+    this.decomposition match {
+      case Some(decomposition) => {
+        decomposition.chainMap(coords)
+      }
+      case None => throw new Exception("Board is not decomposed.")
+    }
+  }
+
+  def getDecomposedGroup(coords: Coords): Option[Group] = {
+    this.decomposition match {
+      case Some(decomposition) => {
+        decomposition.groupMap.get(coords)
+      }
+      case None => throw new Exception("Board is not decomposed.")
+    }
+  }
+
+  def getDecomposedNonEmptyGroup(coords: Coords):Group = {
+    this.decomposition match {
+      case Some(decomposition) => {
+        decomposition.groupMap(coords)
+      }
+      case None => throw new Exception("Board is not decomposed.")
+    }
+  }
 
   /**
    * Tests wheter given coordinates are out of bounds (including border)

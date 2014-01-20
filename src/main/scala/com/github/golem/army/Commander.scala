@@ -15,11 +15,12 @@ import com.github.golem.command.setup.{SetKomi, QuitGame, SetBoardSize}
 import com.github.golem.model.Pass
 import scala.Some
 import com.github.golem.model.Board.{FreeField, Stone, Coords}
-import com.github.golem.model.BasicRulesGame.Chain
+import com.github.golem.model.BasicRulesGame.{Group, Chain}
 import com.github.golem.army.model.Subordinates
 import com.github.golem.army.command.{Objective, SuggestMove}
 import scala.concurrent.{Await, Future}
 import akka.util.Timeout
+import com.github.golem.model.Board._
 
 object Commander {
   def props = Props(classOf[Commander])
@@ -33,7 +34,8 @@ class Commander extends GolemActor {
   private val LOG = Logging(system, this)
   // IDEA: handle other types of rules
   private var currentGameState: Option[GameState] = None
-  private var subordinates: Subordinates = new Subordinates
+  private var privates: Subordinates = new Subordinates
+  private var captains: Subordinates = new Subordinates
 
   implicit val timeout = Timeout(10 seconds)
 
@@ -44,7 +46,8 @@ class Commander extends GolemActor {
           case SetBoardSize(size) => {
             // Start new game
             currentGameState = Some(new GameState(Board(size, size)))
-            subordinates = Subordinates()
+            privates = Subordinates()
+            captains = Subordinates()
             LOG.info(s"Starting new game: $currentGameState")
           }
           case SetKomi(_) => {
@@ -53,22 +56,24 @@ class Commander extends GolemActor {
 
           case QuitGame => {
             LOG.info(s"Game is finished, result state: $currentGameState")
-            subordinates.getActors foreach (subordinate => subordinate ! PoisonPill)
+            privates.getActors foreach (subordinate => subordinate ! PoisonPill)
             currentGameState = None
-            subordinates = Subordinates()
+            privates = Subordinates()
+            captains = Subordinates()
           }
           case MadeMove(move) => {
             updateFor(move)
             LOG.info(s"New game state: $currentGameState") // TODO change to debug
-            LOG.info(s"$subordinates")
+            LOG.info(s"Privates: $privates")
+            LOG.info(s"Captains: $captains")
           }
         }
       }
       case cmd: Command => {
         cmd match {
           case GenerateMove => {
-            val answersFutureList = Future.traverse(subordinates.getActors) {
-              actor => actor.ask(SuggestMove(getGameState, subordinates))
+            val answersFutureList = Future.traverse(privates.getActors) {
+              actor => actor.ask(SuggestMove(getGameState, privates))
             }
             val result = Await.result(answersFutureList, timeout.duration)
 
@@ -87,7 +92,8 @@ class Commander extends GolemActor {
 
             updateFor(bestMove.move)
             LOG.info(s"New game state: $currentGameState") // TODO change to debug
-            LOG.info(s"$subordinates")
+            LOG.info(s"$privates")
+            LOG.info(s"$captains")
           }
         }
       }
@@ -97,7 +103,9 @@ class Commander extends GolemActor {
     }
   }
 
-  def chooseBetter(answer1: SuggestMove.Response, answer2: SuggestMove.Response): SuggestMove.Response = answer1// TODO change that
+  getPrivates
+
+  def chooseBetter(answer1: SuggestMove.Response, answer2: SuggestMove.Response): SuggestMove.Response = answer1 // TODO change that
 
   def suggestMove: SuggestMove.Response = {
     SuggestMove.Response(Pass(identity), Objective(None)) // TODO change that
@@ -114,9 +122,11 @@ class Commander extends GolemActor {
         move match {
           case Pass(_) => {}
           case Put(stone) => {
-            removeGhosts()
+            removeGhostPrivates()
+            removeOrSplitCaptains(stone.owner.opponent())
             // join to neighbour chains
-            join(stone)
+            joinPrivate(stone)
+            joinCaptain(stone)
           }
         }
       }
@@ -135,54 +145,96 @@ class Commander extends GolemActor {
     }
   }
 
-  def getSubordinates = subordinates
+  def getPrivates = privates
 
-  private def removeGhosts(): Unit = {
+  private def removeGhostPrivates() = {
     val board = getGameState.board
-    val ghosts = subordinates.getActors filter {
+    val ghosts = privates.getActors filter {
       subordinate => {
-        val refPosition = subordinates.getReferenceStoneFor(subordinate)
+        val refPosition = privates.getReferenceStoneFor(subordinate)
         board(refPosition.position).isInstanceOf[FreeField]
       }
     }
-    subordinates = subordinates - ghosts
     ghosts foreach (ghost => ghost ! PoisonPill)
+    privates -= ghosts
   }
 
-  private def join(stone: Stone) = {
+  private def removeOrSplitCaptains(player: Player) {
+    val board = getGameState.board
+    // We consider only groups, which belongs to opponent of last move's owner
+    // There is not chance to split captains of current player(they may only join together)
+    val playerCaptains = captains.getActors filter {
+      actor => captains.getReferenceStoneFor(actor).owner == player
+    }
+    for (captain <- playerCaptains) {
+      val captainCoords = captains.getCoordsForSubordinate(captain)
+      val captainGroups = scala.collection.mutable.Set[Group]()
+      for (coord <- captainCoords) {
+        board.getDecomposedGroup(coord) match {
+          case Some(group) => captainGroups += group
+          case None => {} // There is no more group for this captain
+        }
+      }
+      if (captainGroups.isEmpty) {
+        // Captain is death!
+        killCaptain(captain)
+      }
+      else if (captainGroups.size == 1) {
+        // just for sure, refresh captain's fields
+        // TODO how to change name od already created captain? The name of captain can be misleading, because may point to non-existing stone
+        captains -= captain
+        captains = captains.addGroups(Seq((captain, captainGroups.head)))
+      }
+      else if (captainGroups.size > 1) {
+        // We need to split new groups between captains.
+        killCaptain(captain)
+        for (group <- captainGroups) {
+          createCaptain(group)
+          captains = captains.addGroups(Seq((captain, group)))
+        }
+      }
+    }
+  }
+
+  private def killCaptain(captain: ActorRef) {
+    captains -= captain
+    captain ! PoisonPill
+  }
+
+  private def joinPrivate(stone: Stone) = {
     val board = getGameState.board
     val neighbourStones = game.getNeighbourStones(stone.position, stone.owner, board)
     val neighbourSubordinates = (for (stone <- neighbourStones) yield {
-      val actorOption = subordinates.getSubordinateFor(stone.position)
+      val actorOption = privates.getSubordinateFor(stone.position)
       actorOption match {
         case Some(actor) => actor
         case None => throw new IllegalStateException(s"There is no actor for $stone")
       }
     }).toSet
 
-    val chain = BasicRulesGame.getNonEmptyChain(stone.position, board)
+    val chain = board.getDecomposedNonEmptyChain(stone.position)
 
     if (neighbourSubordinates.isEmpty) {
-      val subordinate = createSubordinate(chain)
-      subordinates = subordinates + Seq((subordinate, chain))
+      val subordinate = createPrivate(chain)
+      privates = privates + Seq((subordinate, chain))
     }
     else if (neighbourSubordinates.size <= 1) {
       // Joining new stone to existing chain
       val subordinate = neighbourSubordinates.head
-      subordinates = subordinates + Seq((subordinate, chain))
+      privates = privates + Seq((subordinate, chain))
     } else {
       // Joining some existing chains into one
       // Current strategy - kill neighbours, create new one for larger chain
       // IDEA: maybe some other strategy? creating sets of actors?
       neighbourSubordinates foreach (neighbour => neighbour ! PoisonPill)
-      subordinates = subordinates - neighbourSubordinates
+      privates = privates - neighbourSubordinates
 
-      val subordinate = createSubordinate(chain)
-      subordinates = subordinates + Seq((subordinate, chain))
+      val subordinate = createPrivate(chain)
+      privates = privates + Seq((subordinate, chain))
     }
   }
 
-  private def createSubordinate(chain: Chain): ActorRef = {
+  private def createPrivate(chain: Chain): ActorRef = {
     if (chain.fields.isEmpty)
       throw new IllegalArgumentException(s"Chain should not be empty")
 
@@ -196,7 +248,87 @@ class Commander extends GolemActor {
         actorOf(Spy.props, createSubordinateName(Spy.name, chainElement.position))
       }
     }
-    // TODO send chain to actor
+    newActor
+  }
+
+  // TODO refactor
+  private def joinCaptain(stone: Stone) = {
+    val board = getGameState.board
+    val neighbourCaptains = scala.collection.mutable.Set[ActorRef]()
+    game.DIRECTIONS foreach {
+      direction => // Possible two step neighbourhood
+        val neighbourPosition = stone.position + direction
+        val actorOption = captains.getSubordinateFor(neighbourPosition)
+        actorOption match {
+          case Some(actor) => {
+            board(neighbourPosition) match {
+              case Stone(_, stone.owner) => neighbourCaptains += actor
+              case _ => {}
+            }
+          }
+          case None => {
+            // Try to get actor 1 field further
+            val furtherPosition = stone.position + direction + direction
+            if (!board.isOutOfBounds(furtherPosition.row, furtherPosition.column)) {
+              captains.getSubordinateFor(furtherPosition) match {
+                case Some(furtherActor) => {
+                  board(furtherPosition) match {
+                    // FIXME duplication of code
+                    case Stone(_, stone.owner) => neighbourCaptains += furtherActor
+                    case _ => {}
+                  }
+                }
+                case None => {}
+              }
+            }
+          }
+        }
+    }
+
+    List(N + E, S + E, N + W, S + W) foreach {
+      direction => // Possible 1-step neighbourhood
+        val newPosition = stone.position + direction
+        captains.getSubordinateFor(newPosition) match {
+          case Some(actor) => {
+            board(newPosition) match {
+              // FIXME duplication of code
+              case Stone(_, stone.owner) => neighbourCaptains += actor
+              case _ => {}
+            }
+          }
+          case None => {}
+        }
+    }
+
+    val group = board.getDecomposedNonEmptyGroup(stone.position)
+
+    if (neighbourCaptains.isEmpty) {
+      val captain = createCaptain(group)
+      captains = captains addGroups Seq((captain, group))
+    }
+    else if (neighbourCaptains.size <= 1) {
+      val captain = neighbourCaptains.head
+      captains = captains addGroups Seq((captain, group))
+    } else {
+      neighbourCaptains foreach (neighbour => neighbour ! PoisonPill)
+      captains = captains - neighbourCaptains.toSet
+
+      val captain = createCaptain(group)
+      captains = captains addGroups Seq((captain, group))
+    }
+  }
+
+  private def createCaptain(group: Group): ActorRef = {
+    val chainElement = group.chains.head.fields.head
+    val newActor = chainElement.owner match {
+      case `identity` => {
+        actorOf(Captain.props, createSubordinateName(Captain.name, chainElement.position))
+        // IDEA: creating aliases for other fields of chain?, for example, for one soldier there will be names: soldier_1_1 soldier_1_2, etc.
+      }
+      case _ => {
+        actorOf(SpyLeader.props, createSubordinateName(SpyLeader.name, chainElement.position))
+      }
+    }
     newActor
   }
 

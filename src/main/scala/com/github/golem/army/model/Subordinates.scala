@@ -2,7 +2,7 @@ package com.github.golem.army.model
 
 import akka.actor.ActorRef
 import com.github.golem.model.Board.Stone
-import com.github.golem.model.BasicRulesGame.Chain
+import com.github.golem.model.BasicRulesGame.{Group, Chain}
 import com.github.golem.model.Board.Coords
 
 /**
@@ -17,6 +17,25 @@ case class Subordinates(private val referenceStones: Map[ActorRef, Stone] = Map[
 
   def getSubordinateFor(coords: Coords): Option[ActorRef] = subordinatesMap.get(coords)
 
+  def addGroups(ags: Iterable[(ActorRef, Group)]): Subordinates = {
+    var acs = List[(ActorRef, Chain)]()
+    for(ag <- ags) {
+      for(chain <- ag._2.chains) {
+        acs = (ag._1, chain) :: acs
+      }
+    }
+    this + acs
+  }
+
+  def getCoordsForSubordinate(actor: ActorRef): Set[Coords] = {
+    val subordinateCoords = scala.collection.mutable.Set[Coords]()
+    for(kv <- subordinatesMap) {
+      if(kv._2 == actor)
+        subordinateCoords += kv._1
+    }
+    subordinateCoords.toSet
+  }
+
   def +(acs: Iterable[(ActorRef, Chain)]): Subordinates = {
     var newRefPositions = referenceStones
     var newSubMap = subordinatesMap
@@ -25,6 +44,10 @@ case class Subordinates(private val referenceStones: Map[ActorRef, Stone] = Map[
       newSubMap ++= (for (stone <- ac._2.fields) yield (stone.position -> ac._1))
     }
     Subordinates(newRefPositions, newSubMap)
+  }
+
+  def -(actor: ActorRef): Subordinates = {
+    this - Set[ActorRef](actor)
   }
 
   def -(actors: Set[ActorRef]): Subordinates = {
