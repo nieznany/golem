@@ -75,7 +75,7 @@ class Commander extends GolemActor {
             val answersFutureList = Future.traverse(getSubordinates) {
               actor => actor.ask(SuggestMove(getGameState, privates, captains))
             }
-            val result = Await.result(answersFutureList, timeout.duration)
+            val result = Await.result(answersFutureList, timeout.duration) // Czekaj na wszystkich aktorów dany czas
 
             val moves = result filter {
               result => result.isInstanceOf[SuggestMove.Response]
@@ -83,9 +83,13 @@ class Commander extends GolemActor {
               result => result.asInstanceOf[SuggestMove.Response]
             } // FIX inefficient, how to filter and map at once?
 
+            // moves + suggestMove - ruchy podwladnych + propozycja ruchu przez Generala
+            // Tutaj wybierany jest najlepszy ruch - reduceLeft bierze pare z poczatku
+            // kolekcji, w chooseBetter wybierany jest lepszy z dwoch, i para ruchow
+            // zamieniana jest na lepszy ruch w kolekcji itd. az zejdzie do jednego ruchu
             val bestMove = (moves + suggestMove) reduceLeft {
               (m1, m2) => {
-                chooseBetter(m1, m2)
+                chooseBetter(m1, m2) // Tutaj trzeba wybrac jeden z ruchow
               }
             }
             sender ! GenerateMove.Response(bestMove.move)
