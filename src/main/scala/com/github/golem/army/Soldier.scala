@@ -2,7 +2,7 @@ package com.github.golem.army
 
 import akka.actor.Props
 import akka.event.{LoggingAdapter, Logging}
-import com.github.golem.army.command.{Objective, SuggestMove}
+import com.github.golem.army.command.{Defense, Objective, SuggestMove}
 import com.github.golem.model.{Board, Put, Pass}
 import com.github.golem.model.Board.{FreeField, Stone}
 import scala.Some
@@ -27,7 +27,8 @@ class Soldier extends Private {
           case Some(freeField) => Put(Stone(freeField.position, identity))
           case None => Pass(identity)
         }
-        sender ! SuggestMove.Response(myMove, Objective(Some(myChain)))
+
+        sender ! SuggestMove.Response(myMove, Defense(myChain.fields.size, myChain.breaths.size))
       }
     }
   }

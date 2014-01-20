@@ -16,16 +16,32 @@ import scala.Some
 import com.github.golem.model.Board.{FreeField, Stone, Coords}
 import com.github.golem.model.BasicRulesGame.{Group, Chain}
 import com.github.golem.army.model.Subordinates
-import com.github.golem.army.command.{Objective, SuggestMove}
+import com.github.golem.army.command._
 import scala.concurrent.{Await, Future}
 import akka.util.Timeout
 import com.github.golem.model.Board._
 import com.github.golem.command.tournament.DeadFinalStatusList
+import com.github.golem.army.command.SuggestMove.Response
+import com.github.golem.model.BasicRulesGame.Group
+import com.github.golem.command.setup.SetBoardSize
+import com.github.golem.command.setup.SetKomi
+import scala.Some
+import com.github.golem.model.Put
+import com.github.golem.army.command.Attack
+import com.github.golem.model.Board.Coords
+import com.github.golem.army.command.SuggestMove.Response
+import com.github.golem.command.game.MadeMove
+import com.github.golem.model.BasicRulesGame.Chain
+import com.github.golem.army.command.Defense
+import com.github.golem.model.Pass
+import com.github.golem.army.model.Subordinates
+import com.github.golem.model.Board.Stone
 
 object Commander {
   def props = Props(classOf[Commander])
 }
 
+// TODO this class is huge, split it!
 class Commander extends GolemActor {
 
   import context._
@@ -37,7 +53,55 @@ class Commander extends GolemActor {
   private var privates: Subordinates = new Subordinates
   private var captains: Subordinates = new Subordinates
 
+  // Greater number - higher priority
+  private val movesPriorities: Map[Class[_ <: Move], Int] = Map[Class[_ <: Move], Int](
+    (classOf[Put] -> 1000), classOf[Pass] -> 0)
+  private val objectivePriorities: Map[Class[_ <: Objective], Int] = Map[Class[_ <: Objective], Int](
+    (classOf[Defense] -> 100), (classOf[Attack] -> 90), ((classOf[Fun] -> 1)), classOf[Despair] -> 0)
+
+  object ObjectiveOrdering extends Ordering[Objective] {
+    def compare(x: Objective, y: Objective): Int = {
+      val classPriorirtyDiff = objectivePriorities(x.getClass) - objectivePriorities(y.getClass)
+      if (classPriorirtyDiff == 0) {
+        // Classes with the same priority
+        if (x.getClass != y.getClass) {
+          throw new UnsupportedOperationException("Comparison between different types of objectives is currently not supported.")
+        }
+        x match {
+          case defenseX: PrivatesObjective => {
+            val defenseY = y.asInstanceOf[PrivatesObjective]
+            val priority1 = -(defenseX.nbreathsLeft compareTo (defenseY.nbreathsLeft)) // more important
+            if (priority1 == 0) {
+              return defenseX.nstones compareTo (defenseY.nstones) // less important
+            }
+            else return priority1
+          }
+          case ufo => {
+            throw new IllegalArgumentException(s"Unsupported type of objective: $ufo")
+          }
+        }
+      }
+      else return classPriorirtyDiff
+    }
+  }
+
+  object MoveOrdering extends Ordering[Move] {
+    def compare(x: Move, y: Move): Int = {
+      movesPriorities(x.getClass) - movesPriorities(y.getClass)
+    }
+  }
+
+  object ResponseOrdering extends Ordering[Response] {
+    def compare(x: Response, y: Response): Int = {
+      if (MoveOrdering.compare(x.move, y.move) == 0) {
+        ObjectiveOrdering.compare(x.objective, y.objective)
+      }
+      else MoveOrdering.compare(x.move, y.move)
+    }
+  }
+
   implicit val timeout = Timeout(10 seconds)
+
 
   def handle(message: Any) = {
     message match {
@@ -77,24 +141,16 @@ class Commander extends GolemActor {
             }
             val result = Await.result(answersFutureList, timeout.duration) // Czekaj na wszystkich aktorów dany czas
 
-            val moves = result filter {
+            val responses = result filter {
               result => result.isInstanceOf[SuggestMove.Response]
             } map {
               result => result.asInstanceOf[SuggestMove.Response]
             } // FIX inefficient, how to filter and map at once?
 
-            // moves + suggestMove - ruchy podwladnych + propozycja ruchu przez Generala
-            // Tutaj wybierany jest najlepszy ruch - reduceLeft bierze pare z poczatku
-            // kolekcji, w chooseBetter wybierany jest lepszy z dwoch, i para ruchow
-            // zamieniana jest na lepszy ruch w kolekcji itd. az zejdzie do jednego ruchu
-            val bestMove = (moves + suggestMove) reduceLeft {
-              (m1, m2) => {
-                chooseBetter(m1, m2) // Tutaj trzeba wybrac jeden z ruchow
-              }
-            }
-            sender ! GenerateMove.Response(bestMove.move)
+            val bestResponse = getBestResponse(responses)
+            sender ! GenerateMove.Response(bestResponse.move)
 
-            updateFor(bestMove.move)
+            updateFor(bestResponse.move)
             LOG.info(s"New game state: $currentGameState") // TODO change to debug
             LOG.info(s"$privates")
             LOG.info(s"$captains")
@@ -112,10 +168,12 @@ class Commander extends GolemActor {
 
   def getSubordinates: Set[ActorRef] = privates.getActors.union(captains.getActors)
 
-  def chooseBetter(answer1: SuggestMove.Response, answer2: SuggestMove.Response): SuggestMove.Response = answer1 // TODO change that
+  def getBestResponse(responses: Iterable[Response]): Response = {
+    responses max ResponseOrdering
+  }
 
   def suggestMove: SuggestMove.Response = {
-    SuggestMove.Response(Pass(identity), Objective(None)) // TODO change that
+    SuggestMove.Response(Pass(identity), Fun())
   }
 
   /**
@@ -346,17 +404,10 @@ class Commander extends GolemActor {
   }
 
   private def createSubordinateName(subordType: String, position: Coords) = {
-    s"${
-subordType
-}_${
-position.row
-}_${
-position.column
-}_${
-getGameState.history.moves.size
-}"
+    s"${subordType}_${position.row}_${position.column}_${getGameState.history.moves.size}"
   }
 
   def getLogger: LoggingAdapter = LOG
+
 
 }
