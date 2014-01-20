@@ -18,8 +18,8 @@ class Soldier extends Private {
 
   def handle(message: Any): Unit = {
     message match {
-      case SuggestMove(gameState, siblings) => {
-        val referenceStone = siblings.getReferenceStoneFor(self)
+      case SuggestMove(gameState, privates, captains) => {
+        val referenceStone = privates.getReferenceStoneFor(self)
         val currentBoard = gameState.board
         val myChain = game.getNonEmptyChain(referenceStone.position, currentBoard)
 

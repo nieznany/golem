@@ -3,8 +3,7 @@ package com.github.golem.army
 import akka.actor.{PoisonPill, ActorRef, Props, Actor}
 import com.github.golem.model._
 import com.github.golem.command.game.{GenerateMove, MadeMove}
-import com.github.golem.command.Informative
-import com.github.golem.command.Command
+import com.github.golem.command.{EmptyResponse, Informative, Command}
 import akka.event.{LoggingAdapter, Logging}
 import akka.dispatch._
 import scala.concurrent.{ExecutionContext, Await, Future}
@@ -21,6 +20,7 @@ import com.github.golem.army.command.{Objective, SuggestMove}
 import scala.concurrent.{Await, Future}
 import akka.util.Timeout
 import com.github.golem.model.Board._
+import com.github.golem.command.tournament.DeadFinalStatusList
 
 object Commander {
   def props = Props(classOf[Commander])
@@ -72,8 +72,8 @@ class Commander extends GolemActor {
       case cmd: Command => {
         cmd match {
           case GenerateMove => {
-            val answersFutureList = Future.traverse(privates.getActors) {
-              actor => actor.ask(SuggestMove(getGameState, privates))
+            val answersFutureList = Future.traverse(getSubordinates) {
+              actor => actor.ask(SuggestMove(getGameState, privates, captains))
             }
             val result = Await.result(answersFutureList, timeout.duration)
 
@@ -95,6 +95,9 @@ class Commander extends GolemActor {
             LOG.info(s"$privates")
             LOG.info(s"$captains")
           }
+          case DeadFinalStatusList => {
+            sender ! EmptyResponse
+          }
         }
       }
       case ufo => {
@@ -103,7 +106,7 @@ class Commander extends GolemActor {
     }
   }
 
-  getPrivates
+  def getSubordinates: Set[ActorRef] = privates.getActors.union(captains.getActors)
 
   def chooseBetter(answer1: SuggestMove.Response, answer2: SuggestMove.Response): SuggestMove.Response = answer1 // TODO change that
 

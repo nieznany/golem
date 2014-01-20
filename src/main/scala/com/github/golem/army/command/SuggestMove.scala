@@ -12,4 +12,4 @@ object SuggestMove {
   case class Response(move: Move, objective: Objective)
 }
 
-case class SuggestMove(state: GameState, subordinates: Subordinates)
+case class SuggestMove(state: GameState, privates: Subordinates, captains: Subordinates)

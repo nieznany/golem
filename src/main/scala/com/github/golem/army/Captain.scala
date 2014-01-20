@@ -15,8 +15,8 @@ class Captain extends Private {
 
   def handle(message: Any): Unit = {
     message match {
-      case SuggestMove(gameState, siblings) => {
-        val referenceStone = siblings.getReferenceStoneFor(self)
+      case SuggestMove(gameState, privates, captains) => {
+        val referenceStone = captains.getReferenceStoneFor(self)
         val currentBoard = gameState.board
         // polecam teraz uzywac scachowane grupy/lancuch: patrz getDecomposedNonEmptyChain/Group
         val myChain = currentBoard.getDecomposedNonEmptyGroup(referenceStone.position).chains.head
