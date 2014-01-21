@@ -36,6 +36,7 @@ import com.github.golem.army.command.Defense
 import com.github.golem.model.Pass
 import com.github.golem.army.model.Subordinates
 import com.github.golem.model.Board.Stone
+import scala.util.Random
 
 object Commander {
   def props = Props(classOf[Commander])
@@ -186,7 +187,17 @@ class Commander extends GolemActor {
   }
 
   def suggestMove: SuggestMove.Response = {
-    SuggestMove.Response(Pass(identity), Fun())
+    def randD: Int = Math.random().round.toInt
+    val startPositions = Random.shuffle(List(Coords(3,3), Coords(-3,3), Coords(3,-3), Coords(-3,-3))) map(c => c + Coords(randD, randD))
+    val possiblePosition = startPositions find ({
+      case f: Free => true
+      case _ => false
+    })
+    val move = possiblePosition match {
+      case Some(position) => Put(Stone(position, identity))
+      case None => Pass(identity)
+    }
+    SuggestMove.Response(move, Fun())
   }
 
   /**
