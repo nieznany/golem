@@ -57,25 +57,29 @@ class Commander extends GolemActor {
   private val movesPriorities: Map[Class[_ <: Move], Int] = Map[Class[_ <: Move], Int](
     (classOf[Put] -> 1000), classOf[Pass] -> 0)
   private val objectivePriorities: Map[Class[_ <: Objective], Int] = Map[Class[_ <: Objective], Int](
-    (classOf[Defense] -> 100), (classOf[Attack] -> 90), ((classOf[Fun] -> 1)), classOf[Despair] -> 0)
+    (classOf[Defense] -> 100), (classOf[Attack] -> 100), ((classOf[Fun] -> 1)), classOf[Despair] -> 0)
 
   object ObjectiveOrdering extends Ordering[Objective] {
     def compare(x: Objective, y: Objective): Int = {
       val classPriorirtyDiff = objectivePriorities(x.getClass) - objectivePriorities(y.getClass)
       if (classPriorirtyDiff == 0) {
         // Classes with the same priority
-        if (x.getClass != y.getClass) {
-          throw new UnsupportedOperationException("Comparison between different types of objectives is currently not supported.")
-        }
         x match {
-          case defenseX: PrivatesObjective => {
-            val defenseY = y.asInstanceOf[PrivatesObjective]
-            val priority1 = -(defenseX.nbreathsLeft compareTo (defenseY.nbreathsLeft)) // more important
-            if (priority1 == 0) {
-              return defenseX.nstones compareTo (defenseY.nstones) // less important
+          case privatesObjective1: PrivatesObjective => {
+            y match {
+              case privatesObjective2: PrivatesObjective => {
+                val defenseY = y.asInstanceOf[PrivatesObjective]
+                val priority1 = -(privatesObjective1.nbreathsLeft compareTo (defenseY.nbreathsLeft)) // more important
+                if (priority1 == 0) {
+                  return privatesObjective1.nstones compareTo (defenseY.nstones) // less important
+                }
+                else return priority1
+              }
+              // Other types
+              case _ => return 0
             }
-            else return priority1
           }
+          case _: Objective => return 0 // unhandled objectives are always equal
           case ufo => {
             throw new IllegalArgumentException(s"Unsupported type of objective: $ufo")
           }
@@ -147,7 +151,7 @@ class Commander extends GolemActor {
               result => result.asInstanceOf[SuggestMove.Response]
             } // FIX inefficient, how to filter and map at once?
 
-            val bestResponse = getBestResponse(responses)
+            val bestResponse = getBestResponse(responses + suggestMove)
             sender ! GenerateMove.Response(bestResponse.move)
 
             updateFor(bestResponse.move)
