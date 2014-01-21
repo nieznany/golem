@@ -59,7 +59,7 @@ object BasicRulesGame extends Game {
           if (nextEndangeredFields.size == 1 && nextEndangeredFields.contains(p.stone)) {
             // In next move there will be possibility to reverse back board () suspicious Field should be unavailable
             val state3 = state2 + new Unavailable(suspiciousField, opponent)
-            return state3  ++ decomposeBoard(state3.board)
+            return state3 ++ decomposeBoard(state3.board)
           }
         }
         state2 ++ decomposeBoard(state2.board)
@@ -75,14 +75,14 @@ object BasicRulesGame extends Game {
         val field = board(i, j)
         field match {
           case s: Stone => {
-            if(! visitedStones.contains(s)) {
+            if (!visitedStones.contains(s)) {
               val groupChains = scala.collection.mutable.Set[Chain]()
               val groupTraverser = new GroupTraverser(board, s.owner)
               groupTraverser.traverse(s)
               val groupStones = groupTraverser.groupStones
               // FIXME this is quite inefficient - the same set of stones is traversed twice
-              for(groupStone <- groupStones) {
-                if(! visitedStones.contains(groupStone)) {
+              for (groupStone <- groupStones) {
+                if (!visitedStones.contains(groupStone)) {
                   val chainTraverser = new ChainTraverser(board, groupStone.owner)
                   chainTraverser.traverse(groupStone)
                   val chain = chainTraverser.getNonEmptyChain
@@ -198,6 +198,7 @@ object BasicRulesGame extends Game {
     getNeighbourFields(coords, board) filter {
       case Stone(_, owner) => owner != player
       case Free(_) => true
+      case Unavailable(_, owner) => owner != player
       case _ => false
     }
   }
@@ -284,6 +285,18 @@ object BasicRulesGame extends Game {
     }
   }
 
+  def getGroupAvailablePositions(chains: Set[Chain], board: Board): Set[Coords] = {
+
+    var coords = scala.collection.mutable.Set[Coords]()
+    for (chain <- chains) {
+      for (breath <- chain.breaths) {
+        coords += breath.position
+        getNeighbourFreeFields(breath.position, board) foreach (field => coords += field.position)
+      }
+    }
+    coords.toSet
+  }
+
   /**
    * @return fields, which are not available for $currentPlayer (if currently he makes move).
    *         TODO maybe should include fields, which will be not avaialble in next move?
@@ -311,17 +324,16 @@ object BasicRulesGame extends Game {
   }
 
   /**
-   * Checks if given group of chains is unconditionally alive. Based on Benson's algorithm.
+   * Checks how many stones and fields of group is unconditionally alive. Based on Benson's algorithm.
    * @param chains set of chains forming 1 group
    * @param board current board
-   * @return true if all chains are alive, otherwise false
+   * @return number of live stones and fields
    */
-  def isGroupAlive(chains: Set[Chain], board: Board): Boolean = {
+  def getGroupLives(chains: Set[Chain], board: Board): Int = {
     var regionsMap = scala.collection.mutable.Map[Int, Set[Coords]]()
     var chainsMap = scala.collection.mutable.Map[Int, Chain]()
     var chainsToRegionsMap = scala.collection.mutable.Map[Int, scala.collection.mutable.Set[Int]]()
     var regionsToChainsMap = scala.collection.mutable.Map[Int, scala.collection.mutable.Set[Int]]()
-
 
     chains foreach (chain => chainsMap += chainsMap.size -> chain)
 
@@ -370,30 +382,57 @@ object BasicRulesGame extends Game {
     do {
       sthChanged = false
       for ((key, chain) <- chainsMap) {
-        chainsToRegionsMap.get(key) match {
-          case Some(set) =>
-            compromisedRegions foreach (regionId => set.remove(regionId))
-            if (set.size < 2) {
+        if (!compromisedChains.contains(key)) {
+          chainsToRegionsMap.get(key) match {
+            case Some(set) =>
+              compromisedRegions foreach (regionId => set.remove(regionId))
+              if (set.size < 2) {
+                compromisedChains += key
+                chainsToRegionsMap.remove(key)
+                sthChanged = true;
+              }
+            case None =>
               compromisedChains += key
               chainsToRegionsMap.remove(key)
               sthChanged = true;
-            }
-          case None =>
+          }
         }
       }
       for ((key, region) <- regionsMap) {
-        regionsToChainsMap.get(key) match {
-          case Some(set) => set foreach (chainId => if (compromisedChains.contains(chainId)) {
-            sthChanged = true
-            compromisedRegions += key
-            set.remove(chainId)
-          })
-          case None =>
+        if (!compromisedRegions.contains(key)) {
+          regionsToChainsMap.get(key) match {
+            case Some(set) => set foreach (chainId => if (compromisedChains.contains(chainId)) {
+              sthChanged = true
+              compromisedRegions += key
+              set.remove(chainId)
+            })
+            case None =>
+          }
         }
       }
     } while (sthChanged)
 
-    compromisedChains.isEmpty
+    var liveStones = 0
+    var liveFields = 0
+    var liveRegions = scala.collection.mutable.Set[Int]()
+    for ((key, chain) <- chainsMap) {
+      if (!compromisedChains.contains(key)) {
+        liveStones += chain.fields.size
+        chainsToRegionsMap.get(key) match {
+          case Some(regionsSet) => liveRegions ++= regionsSet
+          case None =>
+        }
+      }
+    }
+    liveRegions foreach(regionId => liveFields += regionsMap.get(regionId).size)
+
+    liveFields + liveStones
+  }
+
+  def getGroupExplorer(board: Board, player: Player, chains: Set[Chain]): GroupExplorer = {
+    val explorer = new GroupExplorer(board, player, chains)
+
+    explorer
   }
 
   private class ChainTraverser(board: Board,
@@ -429,6 +468,7 @@ object BasicRulesGame extends Game {
     }
 
     def getChain = if (chainFields.isEmpty) None else Some(Chain(chainFields, breaths))
+
     def getNonEmptyChain = {
       getChain match {
         case Some(chain) => chain
@@ -436,7 +476,7 @@ object BasicRulesGame extends Game {
       }
     }
   }
-  
+
   // TODO refactor - duplicated code - extract base class for Group and ChainTraverser
   private class GroupTraverser(board: Board,
                                player: Player,
@@ -456,7 +496,7 @@ object BasicRulesGame extends Game {
             }
           }
           case f: FreeField => {
-            DIRECTIONS map (direction => board(field.position + direction)) filter (field => field.isInstanceOf[Stone] && field.asInstanceOf[Stone].owner == player) foreach(stone => traverse(stone))
+            DIRECTIONS map (direction => board(field.position + direction)) filter (field => field.isInstanceOf[Stone] && field.asInstanceOf[Stone].owner == player) foreach (stone => traverse(stone))
           }
           case _: Field => {} // NOP
         }

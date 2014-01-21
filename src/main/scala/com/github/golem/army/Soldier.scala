@@ -1,12 +1,10 @@
 package com.github.golem.army
 
 import akka.actor.Props
-import akka.event.{LoggingAdapter, Logging}
-import com.github.golem.army.command.{Defense, Objective, SuggestMove}
-import com.github.golem.model.{Board, Put, Pass}
-import com.github.golem.model.Board.{FreeField, Stone}
+import com.github.golem.army.command.{Defense, SuggestMove}
+import com.github.golem.model.{Put, Pass}
+import com.github.golem.model.Board.Stone
 import scala.Some
-import com.github.golem.model.BasicRulesGame.Chain
 
 object Soldier {
   def name = "soldier"
