@@ -17,7 +17,23 @@ class commander_get_best_response extends GolemActorUnitSpec {
   val commanderRef = TestActorRef(new Commander)
   val commander = commanderRef.underlyingActor
 
-  "A commander" should "should respect selected priorities of objectives" in {
+  "A commander" should "respect selected ordering fo captains" in {
+    val suggestions = Set[SuggestMove.Response](
+      SuggestMove.Response(Put(Stone(Coords(1,2), Engine)), AttackGroup(5)),
+        SuggestMove.Response(Put(Stone(Coords(1,2), Engine)), DefendGroup(3))
+    )
+    commander.getBestResponse(suggestions).objective should be(AttackGroup(5))
+  }
+
+  "A commander" should "respect selected priorities of captains" in {
+    val suggestions = Set[SuggestMove.Response](
+    SuggestMove.Response(Put(Stone(Coords(1,2), Engine)), Attack(3, 7)),
+    SuggestMove.Response(Put(Stone(Coords(1,2), Engine)), DefendGroup(5))
+    )
+    commander.getBestResponse(suggestions).objective should be(DefendGroup(5))
+  }
+
+  "A commander" should "respect selected priorities of objectives" in {
     val suggestions = Set[SuggestMove.Response](
     SuggestMove.Response(Put(Stone(Coords(1,1), Engine)), Fun()),
     SuggestMove.Response(Put(Stone(Coords(1,2), Engine)), Attack(3, 7))

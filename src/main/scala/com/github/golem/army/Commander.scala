@@ -58,6 +58,7 @@ class Commander extends GolemActor {
     (classOf[Put] -> 1000), classOf[Pass] -> 0)
   private val objectivePriorities: Map[Class[_ <: Objective], Int] = Map[Class[_ <: Objective], Int](
     (classOf[Death] -> 1000),
+    (classOf[AttackGroup] -> 500), (classOf[DefendGroup] -> 500),
     (classOf[Defense] -> 100), (classOf[Attack] -> 100),
     ((classOf[Fun] -> 1)), classOf[Despair] -> 0)
 
@@ -67,13 +68,19 @@ class Commander extends GolemActor {
       if (classPriorirtyDiff == 0) {
         // Classes with the same priority
         x match {
+          case captainsObjective1: CaptainsObjective => {
+            y match {
+              case captainsObjective2: CaptainsObjective => {
+                return captainsObjective1.nstones compareTo(captainsObjective2.nstones)
+              }
+            }
+          }
           case privatesObjective1: PrivatesObjective => {
             y match {
               case privatesObjective2: PrivatesObjective => {
-                val defenseY = y.asInstanceOf[PrivatesObjective]
-                val priority1 = -(privatesObjective1.nbreathsLeft compareTo (defenseY.nbreathsLeft)) // more important
+                val priority1 = -(privatesObjective1.nbreathsLeft compareTo (privatesObjective2.nbreathsLeft)) // more important
                 if (priority1 == 0) {
-                  return privatesObjective1.nstones compareTo (defenseY.nstones) // less important
+                  return privatesObjective1.nstones compareTo (privatesObjective2.nstones) // less important
                 }
                 else return priority1
               }

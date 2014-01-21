@@ -6,6 +6,11 @@ trait PrivatesObjective extends Objective {
   def nstones: Int
   def nbreathsLeft: Int
 }
+
+trait CaptainsObjective extends Objective {
+  def nstones: Int
+}
+
 /**
  * Sent, when actor want to kill some set of stones.
  *
@@ -28,15 +33,15 @@ case class Death(nstones: Int) extends PrivatesObjective {
 
 /**
  * Sent when actor wants to stop opposite player from creating living fields
- * @param damage number of living fields opposite player would acquire if he made this move
+ * @param nstones number of living fields opposite player would acquire if he made this move
  */
-case class AttackGroup(damage:Int) extends Objective
+case class AttackGroup(nstones:Int) extends CaptainsObjective
 
 /**
  * Sent when actor wants to create or expand living fields of group
- * @param gain of new living fields after the move
+ * @param nstones of new living fields after the move
  */
-case class DefendGroup(gain:Int) extends Objective
+case class DefendGroup(nstones:Int) extends CaptainsObjective
 /**
  * Sent, when an actor wants to have fun.
  */
