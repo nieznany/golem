@@ -291,7 +291,8 @@ object BasicRulesGame extends Game {
     for (chain <- chains) {
       for (breath <- chain.breaths) {
         coords += breath.position
-        getNeighbourFreeFields(breath.position, board) foreach (field => coords += field.position)
+        getNeighbourFreeFields(breath.position, board) foreach (field =>
+          if(field.isInstanceOf[Free]) coords += field.position)
       }
     }
     coords.toSet
