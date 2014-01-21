@@ -57,7 +57,9 @@ class Commander extends GolemActor {
   private val movesPriorities: Map[Class[_ <: Move], Int] = Map[Class[_ <: Move], Int](
     (classOf[Put] -> 1000), classOf[Pass] -> 0)
   private val objectivePriorities: Map[Class[_ <: Objective], Int] = Map[Class[_ <: Objective], Int](
-    (classOf[Defense] -> 100), (classOf[Attack] -> 100), ((classOf[Fun] -> 1)), classOf[Despair] -> 0)
+    (classOf[Death] -> 1000),
+    (classOf[Defense] -> 100), (classOf[Attack] -> 100),
+    ((classOf[Fun] -> 1)), classOf[Despair] -> 0)
 
   object ObjectiveOrdering extends Ordering[Objective] {
     def compare(x: Objective, y: Objective): Int = {

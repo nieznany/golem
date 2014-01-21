@@ -22,6 +22,10 @@ case class Attack(nstones: Int, nbreathsLeft: Int) extends PrivatesObjective
  */
 case class Defense(nstones: Int, nbreathsLeft: Int) extends PrivatesObjective
 
+case class Death(nstones: Int) extends PrivatesObjective {
+  def nbreathsLeft: Int = 1
+}
+
 /**
  * Sent when actor wants to stop opposite player from creating living fields
  * @param damage number of living fields opposite player would acquire if he made this move
