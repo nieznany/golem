@@ -221,7 +221,7 @@ class Commander extends GolemActor {
     Random.setSeed(System.currentTimeMillis())
     val freeFields = getGameState.board.getFreeFields
     if(freeFields.isEmpty || Random.nextInt(freeFields.size) < 1) {
-      Pass(identity)
+      return SuggestMove.Response(Pass(identity), Despair())
     }
     SuggestMove.Response(Put(Stone(Random.shuffle(freeFields).head.position, identity)), Despair())
   }
