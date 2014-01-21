@@ -58,6 +58,7 @@ class Commander extends GolemActor {
   private val movesPriorities: Map[Class[_ <: Move], Int] = Map[Class[_ <: Move], Int](
     (classOf[Put] -> 1000), classOf[Pass] -> 0)
   private val objectivePriorities: Map[Class[_ <: Objective], Int] = Map[Class[_ <: Objective], Int](
+    (classOf[Exploration] -> 10000),
     (classOf[Death] -> 1000),
     (classOf[AttackGroup] -> 500), (classOf[DefendGroup] -> 500),
     (classOf[Defense] -> 100), (classOf[Attack] -> 100),
@@ -156,10 +157,12 @@ class Commander extends GolemActor {
             val result = Await.result(answersFutureList, timeout.duration) // Czekaj na wszystkich aktorów dany czas
 
             val responses = result filter {
-              result => result.isInstanceOf[SuggestMove.Response]
+              result => (result.isInstanceOf[SuggestMove.Response]
+                         && BasicRulesGame.isLegal(result.asInstanceOf[SuggestMove.Response].move, getGameState)) // commander does not trust his subordinates TODO but maybe he should? FIXME some of actors send illegal moves - check which one and fix him
             } map {
               result => result.asInstanceOf[SuggestMove.Response]
             } // FIX inefficient, how to filter and map at once?
+
 
             val bestResponse = getBestResponse(responses + suggestMove)
             sender ! GenerateMove.Response(bestResponse.move)
@@ -197,7 +200,7 @@ class Commander extends GolemActor {
       case Some(position) => Put(Stone(position, identity))
       case None => Pass(identity)
     }
-    SuggestMove.Response(move, Fun())
+    SuggestMove.Response(move, if(move.isInstanceOf[Put] && getGameState.history.moves.size <= 5) Exploration() else Fun())
   }
 
   /**

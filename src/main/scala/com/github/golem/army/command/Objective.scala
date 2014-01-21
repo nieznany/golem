@@ -51,3 +51,8 @@ case class Fun() extends Objective
  * Sent, when an actor does not know what to do
  */
 case class Despair() extends Objective
+
+/**
+ * Commander's objective - to explore board on start
+ */
+case class Exploration() extends Objective
