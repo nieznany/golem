@@ -36,7 +36,11 @@ object BasicRulesGame extends Game {
   def makeMove(move: Move, state: GameState): GameState = {
 
     move match {
-      case _: Pass => state + move
+      case pass: Pass => {
+        val state1 = state + move
+        val state2 = state1 ++ updateAvailabilityOfFields(pass.player.opponent(), state1.board)
+        state2 ++ decomposeBoard(state2.board)
+      }
       case p: Put => {
         if (!isLegal(move, state))
           throw new IllegalMoveException(p)

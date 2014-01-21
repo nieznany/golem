@@ -145,6 +145,19 @@ case class Board private(nrows: Int, ncolumns: Int, fields: Map[Coords, Field]) 
    */
   def ++(newFields: Iterable[Field]): Board = this.copy(fields = this.fields ++ (for {field <- newFields} yield field.position -> field))
 
+  def getFreeFields: Set[Field] = {
+    val ff = scala.collection.mutable.Set[Field]()
+    for(i <- 1 to nrows) {
+      for(j <- 1 to ncolumns) {
+        this(i, j) match {
+          case f: Free => ff += f
+          case _ => {}
+        }
+      }
+    }
+    ff.toSet
+  }
+
   override def toString = {
     val result = new StringBuilder(s"board($nrows x $ncolumns):\n")
     for(i <- 1 to nrows) {

@@ -8,7 +8,7 @@ import akka.event.{LoggingAdapter, Logging}
 import akka.dispatch._
 import scala.concurrent.{ExecutionContext, Await, Future}
 import ExecutionContext.Implicits.global
-import akka.pattern.ask
+import akka.pattern.{AskTimeoutException, ask}
 import scala.concurrent.duration._
 import com.github.golem.command.setup.{SetKomi, QuitGame, SetBoardSize}
 import com.github.golem.model.Pass
@@ -37,6 +37,7 @@ import com.github.golem.model.Pass
 import com.github.golem.army.model.Subordinates
 import com.github.golem.model.Board.Stone
 import scala.util.Random
+import java.util.concurrent.TimeoutException
 
 object Commander {
   def props = Props(classOf[Commander])
@@ -73,7 +74,7 @@ class Commander extends GolemActor {
           case captainsObjective1: CaptainsObjective => {
             y match {
               case captainsObjective2: CaptainsObjective => {
-                return captainsObjective1.nstones compareTo(captainsObjective2.nstones)
+                return captainsObjective1.nstones compareTo (captainsObjective2.nstones)
               }
             }
           }
@@ -115,7 +116,7 @@ class Commander extends GolemActor {
     }
   }
 
-  implicit val timeout = Timeout(10 seconds)
+  implicit val timeout = Timeout(2 seconds)
 
 
   def handle(message: Any) = {
@@ -154,21 +155,32 @@ class Commander extends GolemActor {
             val answersFutureList = Future.traverse(getSubordinates) {
               actor => actor.ask(SuggestMove(getGameState, privates, captains))
             }
-            val result = Await.result(answersFutureList, timeout.duration) // Czekaj na wszystkich aktorów dany czas
+            var move: Move = null
+            LOG.info(s"\n\nTHIS IS THE BOARD OF ENGINE PLAYER: ${getGameState.board}\n\n")
+            try {
+              val result = Await.result(answersFutureList, timeout.duration) // Czekaj na wszystkich aktorów dany czas
+              val responses = result filter {
+                  result => (result.isInstanceOf[SuggestMove.Response]
+                    && BasicRulesGame.isLegal(result.asInstanceOf[SuggestMove.Response].move, getGameState)) // commander does not trust his subordinates TODO but maybe he should? FIXME some of actors send illegal moves - check which one and fix him
+                } map {
+                  result => result.asInstanceOf[SuggestMove.Response]
+                } // FIX inefficient, how to filter and map at once?
+              LOG.info(s"GOT RESPONSES: $responses")
 
-            val responses = result filter {
-              result => (result.isInstanceOf[SuggestMove.Response]
-                         && BasicRulesGame.isLegal(result.asInstanceOf[SuggestMove.Response].move, getGameState)) // commander does not trust his subordinates TODO but maybe he should? FIXME some of actors send illegal moves - check which one and fix him
-            } map {
-              result => result.asInstanceOf[SuggestMove.Response]
-            } // FIX inefficient, how to filter and map at once?
-
-
-            val bestResponse = getBestResponse(responses + suggestMove)
-            sender ! GenerateMove.Response(bestResponse.move)
-
-            updateFor(bestResponse.move)
-            LOG.info(s"New game state: $currentGameState") // TODO change to debug
+              val bestResponse = getBestResponse(responses + suggestMove)
+              sender ! GenerateMove.Response(bestResponse.move)
+              LOG.info(s"BEST MOVE: $bestResponse")
+              move = bestResponse.move
+            } catch {
+              case e: TimeoutException => {
+                LOG.warning(s"TIMEOUT! We have no information from subordinates, exception: ${e.getMessage}")
+                val lastChanceMove = suggestLastChanceMove.move
+                sender ! GenerateMove.Response(lastChanceMove)
+                move = lastChanceMove
+              }
+            }
+            updateFor(move)
+            LOG.info(s"New game state: $currentGameState")
             LOG.info(s"$privates")
             LOG.info(s"$captains")
           }
@@ -189,9 +201,11 @@ class Commander extends GolemActor {
     responses max ResponseOrdering
   }
 
+  // Obstawia rogi
   def suggestMove: SuggestMove.Response = {
+    Random.setSeed(System.currentTimeMillis())
     def randD: Int = Math.random().round.toInt
-    val startPositions = Random.shuffle(List(Coords(3,3), Coords(-3,3), Coords(3,-3), Coords(-3,-3))) map(c => c + Coords(randD, randD))
+    val startPositions = Random.shuffle(List(Coords(3, 3), Coords(-3, 3), Coords(3, -3), Coords(-3, -3))) map (c => c + Coords(randD, randD))
     val possiblePosition = startPositions find ({
       case f: Free => true
       case _ => false
@@ -200,7 +214,16 @@ class Commander extends GolemActor {
       case Some(position) => Put(Stone(position, identity))
       case None => Pass(identity)
     }
-    SuggestMove.Response(move, if(move.isInstanceOf[Put] && getGameState.history.moves.size <= 5) Exploration() else Fun())
+    SuggestMove.Response(move, if (move.isInstanceOf[Put] && getGameState.history.moves.size <= 5) Exploration() else Fun())
+  }
+
+  def suggestLastChanceMove: SuggestMove.Response = {
+    Random.setSeed(System.currentTimeMillis())
+    val freeFields = getGameState.board.getFreeFields
+    if(freeFields.isEmpty || Random.nextInt(freeFields.size) < 1) {
+      Pass(identity)
+    }
+    SuggestMove.Response(Put(Stone(Random.shuffle(freeFields).head.position, identity)), Despair())
   }
 
   /**
