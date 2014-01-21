@@ -35,6 +35,7 @@ class Spy extends Private {
           case _ => Attack(myChain.fields.size, myChain.breaths.size)
         }
 
+        LOG.info("Spy suggests: "+ myMove + ", objective:" +objective)
         sender ! SuggestMove.Response(myMove, objective)
       }
     }

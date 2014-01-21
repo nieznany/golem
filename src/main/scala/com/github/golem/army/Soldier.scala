@@ -31,6 +31,7 @@ class Soldier extends Private {
           case _ => Defense(myChain.fields.size, myChain.breaths.size)
         }
 
+        LOG.info("Soldier suggests: "+ myMove + ", objective:" +objective)
         sender ! SuggestMove.Response(myMove, objective)
       }
     }

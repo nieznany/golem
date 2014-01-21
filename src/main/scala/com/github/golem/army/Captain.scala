@@ -28,6 +28,7 @@ class Captain extends Private {
           case Some(freeField) => Put(Stone(freeField.position, identity))
           case None => Pass(identity)
         }
+        LOG.info("Captain suggests: "+ myMove + ", increase:" + increase)
         sender ! SuggestMove.Response(myMove, DefendGroup(increase))
       }
     }

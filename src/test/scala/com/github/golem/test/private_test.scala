@@ -8,17 +8,17 @@ import com.github.golem.model.Board.Coords
 
 class soldier_test extends GolemActorUnitSpec {
   val board1 = Board(Seq(
-    "x.x.x.",
+    "x.x...",
     ".xx..x",
     "xxo..x",
-    "x....x",
-    "x.x.xx",
-    "xx.xx."))
+    "x...ox",
+    "x..oxx",
+    "xx..x."))
 
   val board2 = Board(Seq(
     "oo..",
     "xx..",
-    "x.xx",
+    "x..x",
     "..x."))
 
   "A Soldier" should "suggest best move accordingly to max liberties increase" in {
@@ -38,12 +38,12 @@ class soldier_test extends GolemActorUnitSpec {
     val move2b = spy getBestMoveForChain(chain2, board1)
     val move3b = spy getBestMoveForChain(chain3, board2)
 
-    move1 should be(Some(Free(Coords(3, 5))))
-    move2 should be(Some(Free(Coords(2, 4))))
+    move1 should be(Some(Free(Coords(2, 5))))
+    move2 should be(Some(Free(Coords(6, 3))))
     move3 should be(Some(Free(Coords(2, 3))))
 
-    move1b should be(Some(Free(Coords(3, 5))))
-    move2b should be(Some(Free(Coords(2, 4))))
+    move1b should be(Some(Free(Coords(2, 5))))
+    move2b should be(Some(Free(Coords(6, 3))))
     move3b should be(Some(Free(Coords(2, 3))))
   }
 

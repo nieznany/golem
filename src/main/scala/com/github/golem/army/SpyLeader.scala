@@ -25,6 +25,7 @@ class SpyLeader extends Private {
           case Some(freeField) => Put(Stone(freeField.position, identity))
           case None => Pass(identity)
         }
+        LOG.info("SpyLeader suggests: "+ myMove + ", damage:" + damage)
         sender ! SuggestMove.Response(myMove, AttackGroup(damage))
       }
     }

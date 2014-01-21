@@ -19,15 +19,17 @@ abstract class Private extends GolemActor {
    * choose move that will get for the chain the most liberties
    */
   def getBestMoveForChain(myChain: Chain, currentBoard: Board): Option[FreeField] = {
-    val breathsCoords = (for (breath <- myChain.breaths) yield breath.position).toSet
-    var currentMaxSize = breathsCoords.size
+    val referenceStone = myChain.fields.head
     var bestMove: Option[FreeField] = None
+    var currentMaxSize = myChain.breaths.size
     for (breath <- myChain.breaths) {
-      val neighbourFreeFields = game.getNeighbourFreeFields(breath.position, currentBoard)
-      val newSize: Int = breathsCoords.size + neighbourFreeFields.size - 1
-      if (newSize > currentMaxSize) {
+      val move = Put(Stone(breath.position, referenceStone.owner))
+      val newGameState = BasicRulesGame.makeMove(move, GameState(new MovesHistory(), currentBoard))
+      val newChain = game.getNonEmptyChain(referenceStone.position, newGameState.board)
+
+      if (newChain.breaths.size > currentMaxSize) {
         bestMove = Some(breath)
-        currentMaxSize = newSize
+        currentMaxSize = newChain.breaths.size
       }
     }
     bestMove
