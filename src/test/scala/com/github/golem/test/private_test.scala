@@ -30,13 +30,13 @@ class soldier_test extends GolemActorUnitSpec {
     val chain2 = BasicRulesGame getNonEmptyChain(Coords(2, 2), board1)
     val chain3 = BasicRulesGame getNonEmptyChain(Coords(2, 2), board2)
 
-    val move1 = soldier getBestMove(chain1, board1)
-    val move2 = soldier getBestMove(chain2, board1)
-    val move3 = soldier getBestMove(chain3, board2)
+    val move1 = soldier getBestMoveForChain(chain1, board1)
+    val move2 = soldier getBestMoveForChain(chain2, board1)
+    val move3 = soldier getBestMoveForChain(chain3, board2)
 
-    val move1b = spy getBestMove(chain1, board1)
-    val move2b = spy getBestMove(chain2, board1)
-    val move3b = spy getBestMove(chain3, board2)
+    val move1b = spy getBestMoveForChain(chain1, board1)
+    val move2b = spy getBestMoveForChain(chain2, board1)
+    val move3b = spy getBestMoveForChain(chain3, board2)
 
     move1 should be(Some(Free(Coords(3, 5))))
     move2 should be(Some(Free(Coords(2, 4))))

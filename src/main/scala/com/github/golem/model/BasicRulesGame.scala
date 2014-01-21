@@ -429,12 +429,6 @@ object BasicRulesGame extends Game {
     liveFields + liveStones
   }
 
-  def getGroupExplorer(board: Board, player: Player, chains: Set[Chain]): GroupExplorer = {
-    val explorer = new GroupExplorer(board, player, chains)
-
-    explorer
-  }
-
   private class ChainTraverser(board: Board,
                                player: Player,
                                var chainFields: Set[Stone] = Set[Stone](),

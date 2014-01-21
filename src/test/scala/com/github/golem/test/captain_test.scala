@@ -45,11 +45,16 @@ class captain_test extends GolemActorUnitSpec {
     val chain1 = BasicRulesGame getNonEmptyChain(Coords(1, 3), board3)
     val chain2 = BasicRulesGame getNonEmptyChain(Coords(3, 6), board3)
 
-    val move1 = captain.bestMoveForGroup(Set(chain1), board3)
-    val move2 = captain.bestMoveForGroup(Set(chain2), board3)
 
-    move1 should be(Some(Free(Coords(1, 1))))
-    move2 should be(None)
+    var move1: (Option[Free], Int) = (None, -1)
+    var move2: (Option[Free], Int) = (None, -1)
+    for (i <- 1 to 100) {
+      move1 = captain.getBestMoveForGroup(Set(chain1), board3)
+      move2 = captain.getBestMoveForGroup(Set(chain2), board3)
+    }
+
+    move1 should be(Some(Free(Coords(1, 1))), 8)
+    move2 should be(None, 0)
   }
 
 }

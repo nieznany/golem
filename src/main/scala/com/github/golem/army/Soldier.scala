@@ -21,7 +21,7 @@ class Soldier extends Private {
         val currentBoard = gameState.board
         val myChain = game.getNonEmptyChain(referenceStone.position, currentBoard)
 
-        val myMove = getBestMove(myChain, gameState.board) match {
+        val myMove = getBestMoveForChain(myChain, gameState.board) match {
           case Some(freeField) => Put(Stone(freeField.position, identity))
           case None => Pass(identity)
         }
